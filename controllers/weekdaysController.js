@@ -111,7 +111,7 @@ async function remove(req, res) {
         const db = client.db("ImmunePlus");
         const collection = db.collection("Weekdays");
 
-        const result = await collection.deleteOne({ _id: id });
+        const result = await collection.deleteOne({ _id: parseInt(id) });
         if (result.deletedCount> 0) {
             res.status(200).json({ status: 'success', message: 'Weekday Deleted' });
         } else {

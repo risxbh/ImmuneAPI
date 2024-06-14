@@ -134,9 +134,9 @@ async function remove(req, res) {
         const db = client.db("ImmunePlus");
         const collection = db.collection("TypeOfTreatment");
 
-        const user = await collection.findOne({ _id: id });
+        const user = await collection.findOne({ _id: parseInt(id) });
         console.log(user);
-        const result = await collection.deleteOne({ _id: id });
+        const result = await collection.deleteOne({ _id: parseInt(id) });
         console.log(result);
         if (result.deletedCount> 0) {
             res.status(200).json({ status: 'success', message: 'TypeOfTreatment Deleted' });
