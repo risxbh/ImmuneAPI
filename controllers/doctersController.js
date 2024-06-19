@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const User = require('../models/User');
 const DoctorAvailability = require('../models/Availability');
+const Appointment = require('../models/Appointments')
 const url = 'mongodb+srv://rsrisabhsingh212:Immuneplus123@immuneplus.v6jufn0.mongodb.net/?retryWrites=true&w=majority&appName=ImmunePlus';
 const client = new MongoClient(url, {
     serverApi: {
@@ -70,6 +71,59 @@ async function createAvailabilitySchedule(doctorId, workingDays, workingHours, a
     }
 
     await DoctorAvailability.insertMany(schedules);
+}
+async function bookAppointment(req, res) {
+    const { doctorId, date, time, patientId } = req.body;
+
+    if (!doctorId || !date || !time || !patientId) {
+        return res.status(400).json({ status: 'error', message: 'Doctor ID, date, time, and patient ID are required' });
+    }
+
+    try {
+        await client.connect();
+        const db = client.db("ImmunePlus");
+        const collection = db.collection("doctoravailabilities");
+
+        const appointmentDate = new Date(date);
+        const timeSlot = `${time}:00`;
+
+        // Find the availability schedule for the given doctor, date, and time
+        const availability = await collection.findOne({
+            doctorId,
+            date: appointmentDate,
+            time: timeSlot
+        });
+
+        if (!availability) {
+            return res.status(404).json({ status: 'error', message: 'No availability found for the given date and time' });
+        }
+
+        if (availability.availableSlots > 0) {
+            // Decrement the available slots and increment the bookings
+            await collection.updateOne(
+                { _id: availability._id },
+                { $inc: { availableSlots: -1, bookings: 1 } }
+            );
+
+            // Insert the appointment record
+            const newAppointment = new Appointment({
+                doctorId,
+                date: appointmentDate,
+                time: timeSlot,
+                patientId
+            });
+
+            await newAppointment.save();
+
+            res.status(200).json({ status: 'success', message: 'Appointment booked successfully' });
+        } else {
+            res.status(400).json({ status: 'error', message: 'No available slots for the given date and time' });
+        }
+    } catch (error) {
+        res.status(500).json({ status: 'error', message: 'An error occurred during booking', reason: error.message });
+    } finally {
+        await client.close();
+    }
 }
 
 
@@ -401,5 +455,6 @@ module.exports = {
     getAll,
     getAllAvailableDocter,
     getDocterbyId,
+    bookAppointment,
     upload
 };

@@ -14,9 +14,19 @@ const client = new MongoClient(url, {
 async function loginUser(req, res) {
     const { phoneNumber, password } = req.body;
     let validations = [];
+    let phoneNumMessage = '';
 
     if (!password) validations.push({ key: 'password', message: 'Password is required' });
-    if (!phoneNumber) validations.push({ key: 'phoneNumber', message: 'Phone number is required' });
+    if (phoneNumber) {
+        if (phoneNumber.length < 10 || phoneNumber.length > 10) {
+            phoneNumMessage = 'Phone Number should habe 10 digits.';
+        }
+    } else {
+        phoneNumMessage = 'Phone Number is required.';
+    }
+    if (phoneNumMessage) {
+        validations.push({ key: 'Phone Number', message: phoneNumMessage });
+    }
 
 
     if (validations.length) {
@@ -64,8 +74,21 @@ async function registerUser(req, res) {
     let validations = [];
     let regex = /^(?=.*[0-9])(?=.*[!@#$%^&*])(?=.*[A-Z])(?=.*[a-z])/;
     let emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    
 
     let passwordMessage = '';
+    let phoneNumMessage = '';
+
+    if (phoneNumber) {
+        if (phoneNumber.length < 10 || phoneNumber.length > 10) {
+            phoneNumMessage = 'Phone Number should habe 10 digits.';
+        }
+    } else {
+        phoneNumMessage = 'Phone Number is required.';
+    }
+    if (phoneNumMessage) {
+        validations.push({ key: 'Phone Number', message: phoneNumMessage });
+    }
 
     if (password) {
         if (password.length < 8 || password.length > 20) {
@@ -84,7 +107,6 @@ async function registerUser(req, res) {
         validations.push({ key: 'password', message: passwordMessage });
     }
 
-    if (!password) validations.push({ key: 'password', message: 'Password is required' });
     if (!address) validations.push({ key: 'address', message: 'Address is required' });
     if (!fullName) validations.push({ key: 'fullName', message: 'Full name is required' });
     if (!email) validations.push({ key: 'email', message: 'Email is required' });
