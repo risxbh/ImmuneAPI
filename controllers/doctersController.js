@@ -7,11 +7,12 @@ const User = require('../models/User');
 const DoctorAvailability = require('../models/Availability');
 const Appointment = require('../models/Appointments')
 const url = 'mongodb+srv://rsrisabhsingh212:Immuneplus123@immuneplus.v6jufn0.mongodb.net/?retryWrites=true&w=majority&appName=ImmunePlus';
-const client = new MongoClient(url, {
+let client = new MongoClient(url, {
     serverApi: {
         version: ServerApiVersion.v1,
         strict: true,
         deprecationErrors: true,
+        useNewUrlParser: true, useUnifiedTopology: true
     }
 });
 
@@ -83,9 +84,10 @@ async function bookAppointment(req, res) {
         await client.connect();
         const db = client.db("ImmunePlus");
         const collection = db.collection("doctoravailabilities");
+        const countersCollection = db.collection("Counters");
 
         const appointmentDate = new Date(date);
-        const timeSlot = `${time}:00`;
+        const timeSlot = `${time}`;
 
         // Find the availability schedule for the given doctor, date, and time
         const availability = await collection.findOne({
@@ -105,8 +107,17 @@ async function bookAppointment(req, res) {
                 { $inc: { availableSlots: -1, bookings: 1 } }
             );
 
+            // Generate a unique appointment ID
+            const counterAppointment = await countersCollection.findOneAndUpdate(
+                { _id: "appointmentId" },
+                { $inc: { seq: 1 } },
+                { upsert: true, returnDocument: 'after' }
+            );
+            const newAppointmentId = counterAppointment.seq; // Convert to string or use as number
+
             // Insert the appointment record
             const newAppointment = new Appointment({
+                _id: newAppointmentId,
                 doctorId,
                 date: appointmentDate,
                 time: timeSlot,
@@ -115,7 +126,7 @@ async function bookAppointment(req, res) {
 
             await newAppointment.save();
 
-            res.status(200).json({ status: 'success', message: 'Appointment booked successfully' });
+            res.status(200).json({ status: 'success', message: 'Appointment booked successfully', appointmentId: newAppointmentId });
         } else {
             res.status(400).json({ status: 'error', message: 'No available slots for the given date and time' });
         }
@@ -125,6 +136,9 @@ async function bookAppointment(req, res) {
         await client.close();
     }
 }
+
+module.exports = bookAppointment;
+
 
 
 
@@ -237,11 +251,6 @@ async function registerDoctor(req, res) {
         await client.close();
     }
 }
-
-
-
-
-
 
 async function loginDoctor(req, res) {
     const { email, password } = req.body;
