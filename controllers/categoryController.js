@@ -42,7 +42,7 @@ async function create(req, res) {
         } else {
             const filePath = path.join('uploads/category', req.file.originalname);
             if (!fs.existsSync('uploads/category')) {
-                fs.mkdirSync('uploads/treatment', { recursive: true });
+                fs.mkdirSync('uploads/category', { recursive: true });
             }
             fs.writeFileSync(filePath, req.file.buffer);
 

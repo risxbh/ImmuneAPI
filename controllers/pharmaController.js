@@ -1,6 +1,8 @@
 const bcrypt = require('bcrypt');
+const multer = require('multer');
+const fs = require('fs');
+const path = require('path');
 const { MongoClient, ServerApiVersion } = require('mongodb');
-const User = require('../models/User');
 const url = 'mongodb+srv://rsrisabhsingh212:Immuneplus123@immuneplus.v6jufn0.mongodb.net/?retryWrites=true&w=majority&appName=ImmunePlus';
 const client = new MongoClient(url, {
     serverApi: {
@@ -10,78 +12,23 @@ const client = new MongoClient(url, {
     }
 });
 
-// User login controller
-async function loginUser(req, res) {
-    const { phoneNumber, password } = req.body;
-    let validations = [];
-    let phoneNumMessage = '';
+// Pharma login controller
 
-    if (!password) validations.push({ key: 'password', message: 'Password is required' });
-    if (phoneNumber) {
-        if (phoneNumber.length < 10 || phoneNumber.length > 10) {
-            phoneNumMessage = 'Phone Number should habe 10 digits.';
-        }
-    } else {
-        phoneNumMessage = 'Phone Number is required.';
-    }
-    if (phoneNumMessage) {
-        validations.push({ key: 'Phone Number', message: phoneNumMessage });
-    }
+const storage = multer.memoryStorage();
+const upload = multer({ storage });
 
-
-    if (validations.length) {
-        res.status(400).json({ status: 'error', validations: validations });
-        return;
-    }
-
-    try {
-        await client.connect();
-        const db = client.db("ImmunePlus");
-        const collection = db.collection("Users");
-        const user = await collection.findOne({ phoneNumber: phoneNumber });
-
-        if (user) {
-            const result = await bcrypt.compare(password, user.password);
-            if (result) {
-                const userInfo = {
-                    fullName: user.fullName,
-                    id: user._id,
-                    gender: user.gender,
-                    address: user.address,
-                    state: user.state,
-                    ageGroup: user.ageGroup,
-                    email: user.email,
-                    pincode: user.pincode,
-                    phoneNumber: user.phoneNumber,
-                    previousHistory: user.previousHistory
-                };
-
-                res.json({ status: 'success', message: 'Login successfull!', user: userInfo });
-            } else {
-                res.status(400).json({ status: 'error', message: 'Invalid Phone Number or password' });
-            }
-        } else {
-            res.status(400).json({ status: 'error', message: 'Invalid email or password' });
-        }
-    } finally {
-        await client.close();
-    }
-}
-
-// User registration controller
 async function registerUser(req, res) {
-    const { password, address, fullName, ageGroup, email, gender, state, pincode, phoneNumber, previousHistory } = req.body;
+    const { name, password, address, phoneNumber, licenseNo, email } = req.body;
     let validations = [];
     let regex = /^(?=.*[0-9])(?=.*[!@#$%^&*])(?=.*[A-Z])(?=.*[a-z])/;
     let emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     
-
     let passwordMessage = '';
     let phoneNumMessage = '';
 
     if (phoneNumber) {
-        if (phoneNumber.length < 10 || phoneNumber.length > 10) {
-            phoneNumMessage = 'Phone Number should habe 10 digits.';
+        if (phoneNumber.length !== 10) {
+            phoneNumMessage = 'Phone Number should have 10 digits.';
         }
     } else {
         phoneNumMessage = 'Phone Number is required.';
@@ -108,14 +55,81 @@ async function registerUser(req, res) {
     }
 
     if (!address) validations.push({ key: 'address', message: 'Address is required' });
-    if (!fullName) validations.push({ key: 'fullName', message: 'Full name is required' });
+    if (!name) validations.push({ key: 'name', message: 'Name is required' });
     if (!email) validations.push({ key: 'email', message: 'Email is required' });
     else if (!emailRegex.test(email)) validations.push({ key: 'email', message: 'Email is not valid' });
-    if (!gender) validations.push({ key: 'gender', message: 'Gender is required' });
-    if (!state) validations.push({ key: 'state', message: 'State is required' });
-    if (!pincode) validations.push({ key: 'pincode', message: 'Pincode is required' });
-    if (!phoneNumber) validations.push({ key: 'phoneNumber', message: 'Phone number is required' });
-    if (!ageGroup) validations.push({ key: 'ageGroup', message: 'Age Group is required' });
+    if (!licenseNo) validations.push({ key: 'licenseNo', message: 'License No is required' });
+    if (!req.file || !req.file.buffer) validations.push({ key: 'licenseImg', message: 'Image is required' });
+
+    if (validations.length) {
+        res.status(400).json({ status: 'error', validations: validations });
+        return;
+    }
+
+    try {
+        await client.connect();
+        const db = client.db("ImmunePlus");
+        const collection = db.collection("Pharmacy");
+        const countersCollection = db.collection("Counters");
+
+        const existingUser = await collection.findOne({ phoneNumber });
+
+        if (existingUser) {
+            res.status(400).json({ status: 'error', message: 'Phone Number already exists' });
+        } else {
+            const filePath = path.join('uploads/pharmacy', req.file.originalname);
+            if (!fs.existsSync('uploads/pharmacy')) {
+                fs.mkdirSync('uploads/pharmacy', { recursive: true });
+            }
+            fs.writeFileSync(filePath, req.file.buffer);
+            const hashedPassword = await bcrypt.hash(password, 10);
+
+            const counter = await countersCollection.findOneAndUpdate(
+                { _id: "pharmacyId" },
+                { $inc: { seq: 1 } },
+                { upsert: true, returnDocument: 'after' }
+            );
+            const newId = counter.seq;
+
+            const result = await collection.insertOne({
+                _id: newId,
+                password: hashedPassword,
+                address,
+                name,
+                phoneNumber,
+                licenseNo,
+                licenseImg: filePath
+            });
+           
+            if (result.acknowledged === true) {
+                return res.status(200).json({ status: 'success', message: 'Pharmacy registered successfully' });
+            } else {
+                res.status(400).json({ status: 'error', message: 'Registration failed' });
+            }
+        }
+    } catch (error) {
+        res.status(500).json({ status: 'error', message: 'An error occurred during registration', reason: error.message });
+    } finally {
+        await client.close();
+    }
+}
+async function loginUser(req, res) {
+    const { phoneNumber, password } = req.body;
+    let validations = [];
+    let phoneNumMessage = '';
+
+    if (!password) validations.push({ key: 'password', message: 'Password is required' });
+    if (!req.file || !req.file.buffer) validations.push({ key: 'img', message: 'Image is required' });
+    if (phoneNumber) {
+        if (phoneNumber.length < 10 || phoneNumber.length > 10) {
+            phoneNumMessage = 'Phone Number should habe 10 digits.';
+        }
+    } else {
+        phoneNumMessage = 'Phone Number is required.';
+    }
+    if (phoneNumMessage) {
+        validations.push({ key: 'Phone Number', message: phoneNumMessage });
+    }
 
 
     if (validations.length) {
@@ -124,61 +138,46 @@ async function registerUser(req, res) {
     }
 
     try {
-
         await client.connect();
         const db = client.db("ImmunePlus");
-        const collection = db.collection("Users");
-        const countersCollection = db.collection("Counters");
+        const collection = db.collection("Pharmacy");
+        const user = await collection.findOne({ phoneNumber: phoneNumber });
 
-        const existingUser = await collection.findOne({ phoneNumber });
+        if (user) {
+            const result = await bcrypt.compare(password, user.password);
+            if (result) {
+                const userInfo = {
+                    name: user.name,
+                    id: user._id,
+                    address: user.address,
+                    licenseNo: user.licenseNo,
+                    phoneNumber: user.phoneNumber,
+                    previousHistory: user.previousHistory,
+                    licenseImg: user.licenseImg
+                };
 
-        if (existingUser) {
-            res.status(400).json({ status: 'error', message: 'Phone Number already exists' });
-        } else {
-            const hashedPassword = await bcrypt.hash(password, 10);
-
-            const counter = await countersCollection.findOneAndUpdate(
-                { _id: "userId" },
-                { $inc: { seq: 1 } },
-                { upsert: true, returnDocument: 'after' }
-            );
-            const newId = counter.seq;
-
-            const result = await collection.insertOne({
-                password: hashedPassword,
-                address,
-                fullName,
-                ageGroup,
-                email,
-                gender,
-                state,
-                pincode,
-                phoneNumber,
-                previousHistory,
-                _id: newId
-            });
-           
-            console.log(result);
-            if (result.acknowledged === true) {
-                return res.status(200).json({ status: 'success', message: 'User registered successfully' });
+                res.json({ status: 'success', message: 'Login successfull!', user: userInfo });
             } else {
-                res.status(400).json({ status: 'error', message: 'Registration failed' });
+                res.status(400).json({ status: 'error', message: 'Invalid Phone Number or password' });
             }
+        } else {
+            res.status(400).json({ status: 'error', message: 'Invalid email or password' });
         }
-    } catch (error) {
-        res.status(500).json({ status: 'error', message: 'An error occurred during registration', reason: error });
     } finally {
         await client.close();
     }
 }
 
+// User registration controller
+
+
 async function updateUser(req, res) {
-    const { id, password, address, fullName, ageGroup, email, gender, state, pincode, phoneNumber, previousHistory } = req.body;
+    const { name, password, address, phoneNumber, licenseNo, email, id } = req.body;
     let validations = [];
     let regex = /^(?=.*[0-9])(?=.*[!@#$%^&*])(?=.*[A-Z])(?=.*[a-z])/;
     let emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-    if (!id) validations.push({ key: 'id', message: 'User ID is required' });
+    if (!id) validations.push({ key: 'id', message: 'Pharmacy ID is required' });
 
     if (password && (password.length < 8 || password.length > 20 || !regex.test(password))) {
         validations.push({ key: 'password', message: 'Password should be between 8 to 20 characters, contain at least one number, one special character, and one uppercase letter.' });
@@ -194,9 +193,9 @@ async function updateUser(req, res) {
     try {
         await client.connect();
         const db = client.db("ImmunePlus");
-        const collection = db.collection("Users");
+        const collection = db.collection("Pharmacy");
 
-        const user = await collection.findOne({ _id: id });
+        const user = await collection.findOne({ _id: parseInt(id) });
 
         if (!user) {
             res.status(400).json({ status: 'error', message: 'User not found' });
@@ -209,16 +208,20 @@ async function updateUser(req, res) {
             updatedFields.password = hashedPassword;
         }
         if (address) updatedFields.address = address;
-        if (fullName) updatedFields.fullName = fullName;
-        if (ageGroup) updatedFields.ageGroup = ageGroup;
+        if (name) updatedFields.name = name;
         if (email) updatedFields.email = email;
-        if (gender) updatedFields.gender = gender;
-        if (state) updatedFields.state = state;
-        if (pincode) updatedFields.pincode = pincode;
+        if (licenseNo) updatedFields.licenseNo = licenseNo;
         if (phoneNumber) updatedFields.phoneNumber = phoneNumber;
-        if (previousHistory) updatedFields.previousHistory = previousHistory;
+        if (req.file && req.file.buffer) {
+            const filePath = path.join('uploads/category', req.file.originalname);
+            if (!fs.existsSync('uploads/category')) {
+                fs.mkdirSync('uploads/category', { recursive: true });
+            }
+            fs.writeFileSync(filePath, req.file.buffer);
+            updatedFields.licenseImg = filePath;
+        }
 
-        const result = await collection.updateOne({ _id }, { $set: updatedFields });
+        const result = await collection.updateOne({ _id: parseInt(id) }, { $set: updatedFields });
 
         if (result.modifiedCount > 0) {
             res.status(200).json({ status: 'success', message: 'User updated successfully' });
@@ -244,16 +247,16 @@ async function deleteUser(req, res) {
     try {
         await client.connect();
         const db = client.db("ImmunePlus");
-        const collection = db.collection("Users");
+        const collection = db.collection("Pharmacy");
 
-        const user = await collection.findOne({ _id });
+        const user = await collection.findOne({ _id: id });
 
         if (!user) {
             res.status(400).json({ status: 'error', message: 'User not found' });
             return;
         }
 
-        const result = await collection.deleteOne({ _id: id });
+        const result = await collection.deleteOne({  _id: id });
 
         if (result.deletedCount > 0) {
             res.status(200).json({ status: 'success', message: 'User deleted successfully' });
@@ -270,7 +273,7 @@ async function deleteUser(req, res) {
 async function getAll(req, res) {
     try {
         const db = client.db("ImmunePlus");
-        const collection = db.collection("Users");
+        const collection = db.collection("Pharmacy");
         
         const users = await collection.find().toArray();
         res.json(users);
@@ -284,5 +287,6 @@ module.exports = {
     registerUser,
     updateUser,
     deleteUser,
-    getAll
+    getAll,
+    upload
 };

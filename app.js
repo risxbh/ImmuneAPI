@@ -10,6 +10,8 @@ const categoryRoutes = require('./routes/categoryRoutes');
 const weekdayRoutes = require('./routes/weekdays')
 const docterRoutes = require('./routes/docterRoutes')
 const workingHours = require('./routes/workingHours')
+const productRoutes = require('./routes/productRoutes')
+const pharmaRoutes = require('./routes/pharmaRoutes')
 
 const app = express();
 const port = 5000;
@@ -27,6 +29,8 @@ app.use('/category', categoryRoutes);
 app.use('/weekday', weekdayRoutes);
 app.use('/docter', docterRoutes);
 app.use('/workingHours', workingHours);
+app.use('/product', productRoutes);
+app.use('/pharma', pharmaRoutes);
 
 mongoose.connect('mongodb+srv://rsrisabhsingh212:Immuneplus123@immuneplus.v6jufn0.mongodb.net/ImmunePlus?retryWrites=true&w=majority', {
     useNewUrlParser: true,
