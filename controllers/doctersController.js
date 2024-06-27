@@ -139,9 +139,6 @@ async function bookAppointment(req, res) {
 
 module.exports = bookAppointment;
 
-
-
-
 async function registerDoctor(req, res) {
     const { name, hospital, about, type, patients, experience, rating, workinghours, availableSlots, location, specialist, workingDays, videoFee, appointmentFee, email, password } = req.body;
     let validations = [];

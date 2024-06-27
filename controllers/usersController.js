@@ -246,7 +246,7 @@ async function deleteUser(req, res) {
         const db = client.db("ImmunePlus");
         const collection = db.collection("Users");
 
-        const user = await collection.findOne({ _id });
+        const user = await collection.findOne({ _id: id });
 
         if (!user) {
             res.status(400).json({ status: 'error', message: 'User not found' });
