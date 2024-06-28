@@ -53,8 +53,8 @@ io.on('connection', (socket) => {
   
   global.io = io;
   
-  server.listen(3000, () => {
-    console.log('Server is running on port 3000');
+  server.listen(5000, () => {
+    console.log('Server is running on port 5000');
   });
 
 // mongoose.connect('mongodb+srv://rsrisabhsingh212:Immuneplus123@immuneplus.v6jufn0.mongodb.net/ImmunePlus?retryWrites=true&w=majority', {

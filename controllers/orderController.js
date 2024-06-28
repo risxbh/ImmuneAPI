@@ -40,10 +40,11 @@ async function placeOrder(req, res) {
             if (!product.pieces) validations.push({ key: `products[${index}].pieces`, message: 'Pieces are required' });
             if (!product.dose) validations.push({ key: `products[${index}].dose`, message: 'Dose is required' });
             if (!product.quantity) validations.push({ key: `products[${index}].quantity`, message: 'Quantity is required' });
+            if (!product.name) validations.push({ key: `products[${index}].name`, message: 'Product Name is required' });
         });
 
-        if (validations.length) {
-            return res.status(400).json({ status: 'error', validations: validations });
+        if (validations.length > 0) {
+            return res.status(400).json({ status: 'error', validations });
         }
 
         // Get and increment the counter for Orders
@@ -60,6 +61,7 @@ async function placeOrder(req, res) {
             userId,
             products: products.map(product => ({
                 productId: parseFloat(product.productId),
+                name: product.name,
                 price: parseFloat(product.price),
                 pieces: parseFloat(product.pieces),
                 dose: parseFloat(product.dose),
@@ -72,35 +74,42 @@ async function placeOrder(req, res) {
 
         const result = await ordersCollection.insertOne(order);
 
-        if (result.acknowledged === true) {
-            // Emit WebSocket notification to all connected clients
+        if (result.acknowledged) {
+          
             const pharmacies = await pharmacyCollection.find().toArray();
             pharmacies.forEach(pharmacy => {
-                global.io.emit('newOrder', { orderId: newOrderId, pharmacyId: pharmacy._id });
+                return global.io.emit('newOrder', { orderId: newOrderId, pharmacyId: pharmacy._id });
             });
-
             // Send success response to client
-            res.status(200).json({ status: 'success', message: 'Order placed successfully', orderId: newOrderId });
+           // return res.status(200).json({ status: 'success', message: 'Order placed successfully', orderId: newOrderId });
         } else {
-            res.status(400).json({ status: 'error', message: 'Order placement failed' });
+            throw new Error('Failed to place order');
         }
         
     } catch (error) {
         res.status(500).json({ status: 'error', message: 'An error occurred during order placement', reason: error.message });
-    } finally {
-        await client.close();
     }
 }
 
 
-const getOrders = async (req, res) => {
-    try {
-      const orders = await Order.find({ pharmacyId: req.params.pharmacyId });
-      res.status(200).json({ status: 'success', orders });
-    } catch (error) {
-      res.status(500).json({ status: 'error', message: 'Failed to fetch orders', reason: error.message });
+
+async function getOrderbyId(req, res) {
+    const { id } = req.body;
+
+    if (!id) {
+        res.status(400).json({ status: 'error', message: 'Order ID is required' });
+        return;
     }
-  };
+    try {
+        const db = client.db("ImmunePlus");
+        const collection = db.collection("Orders");
+        const order = await collection.findOne({_id: parseInt(id) });
+        res.json(order);
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to fetch order', error: error.message });
+    }
+}
+
 async function getAllProducts(req, res) {
     try {
         const db = client.db("ImmunePlus");
@@ -200,5 +209,5 @@ module.exports = {
     upload,
     update,
     remove,
-    getOrders
+    getOrderbyId
 };

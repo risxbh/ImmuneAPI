@@ -1,5 +1,5 @@
 const express = require('express');
-const { placeOrder, getAllProducts, upload, update,remove, getOrders } = require('../controllers/orderController');
+const { placeOrder, getAllProducts, upload, update,remove, getOrderbyId } = require('../controllers/orderController');
 
 const router = express.Router();
 
@@ -18,5 +18,5 @@ router.post('/create', async (req, res) => {
 router.get('/records', getAllProducts);
 router.post('/update',upload.single('img'), update);
 router.post('/delete', remove);
-router.get('/:pharmacyId', getOrders);
+router.get('/id', getOrderbyId);
 module.exports = router;
