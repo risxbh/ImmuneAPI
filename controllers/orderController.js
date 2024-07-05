@@ -13,6 +13,7 @@ const client = new MongoClient(url, {
 });
 const Order = require('../models/Order');
 const Pharmacy = require('../models/Pharmacy');
+const responses = new Map();
 
 // Multer configuration for memory storage
 const storage = multer.memoryStorage();
@@ -75,7 +76,8 @@ async function placeOrder(req, res) {
         const result = await ordersCollection.insertOne(order);
 
         if (result.acknowledged) {
-          
+            
+            evaluateResponses(newOrderId);
             const pharmacies = await pharmacyCollection.find().toArray();
             pharmacies.forEach(pharmacy => {
                 return global.io.emit('newOrder', { orderId: newOrderId, pharmacyId: pharmacy._id });
@@ -110,104 +112,190 @@ async function getOrderbyId(req, res) {
     }
 }
 
-async function getAllProducts(req, res) {
-    try {
-        const db = client.db("ImmunePlus");
-        const collection = db.collection("Products");
 
-        const categories = await collection.find().toArray();
-        res.json(categories);
+async function evaluateResponses(orderId) {
+    setTimeout(async () => {
+        console.log(responses);
+        if (responses.has(orderId)) {
+            const orderResponses = responses.get(orderId);
+            let bestPharmacy = null;
+            let maxAvailableProducts = -1;
+
+            orderResponses.forEach(response => {
+                const availableProducts = response.products.filter(product => product.available).length;
+                if (availableProducts > maxAvailableProducts) {
+                    maxAvailableProducts = availableProducts;
+                    bestPharmacy = response.pharmacyId;
+                }
+                console.log(availableProducts, maxAvailableProducts, response.pharmacyId);
+            });
+
+            if (bestPharmacy) {
+                await assignOrderToPharmacy(orderId, bestPharmacy);
+            } else {
+                // Handle case where no suitable pharmacy is found
+                console.log(`No suitable pharmacy found for order ${orderId}`);
+                global.io.emit('noSuitablePharmacy', { orderId });
+            }
+
+            responses.delete(orderId);
+        } else {
+            // Handle case where no responses were received
+            console.log(`No responses received for order ${orderId}`);
+            global.io.emit('noResponses', { orderId });
+        }
+    }, 30000);
+}
+
+async function assignOrderToPharmacy(orderId, pharmacyId) {
+    try {
+        await client.connect();
+        const db = client.db("ImmunePlus");
+        const ordersCollection = db.collection("Orders");
+
+        await ordersCollection.updateOne({ _id: orderId }, { $set: { assignedPharmacy: pharmacyId, status: 1 } });
+
+        global.io.emit('orderAssigned', { orderId, pharmacyId });
+        console.log(`Order ${orderId} assigned to pharmacy ${pharmacyId}`);
+
+        // Send order confirmation notification
+        await sendOrderConfirmationNotification(orderId, pharmacyId);
     } catch (error) {
-        res.status(500).json({ message: 'Failed to fetch product', error: error.message });
+        console.error("Error assigning order to pharmacy:", error);
     }
 }
 
-async function update(req, res) {
+
+async function receivePharmacyResponse(req, res) {
+    const { orderId, pharmacyId, products } = req.body;
+
+    if (!orderId || !pharmacyId || !Array.isArray(products)) {
+        return res.status(400).json({ status: 'error', message: 'orderId, pharmacyId, and products are required' });
+    }
+    
     try {
+        if (!responses.has(orderId)) {
+            responses.set(orderId, []);
+        }
+        responses.get(orderId).push({ pharmacyId, products });
+
+        const canFulfillEntireOrder = products.every(product => product.available);
+
+        if (canFulfillEntireOrder) {
+            await assignOrderToPharmacy(orderId, pharmacyId);
+            return res.status(200).json({ status: 'success', message: 'Order assigned immediately', orderId });
+        }
+
+        res.status(200).json({ status: 'success', message: 'Response recorded' });
+    } catch (error) {
+        res.status(500).json({ status: 'error', message: 'Failed to record response', reason: error.message });
+    }
+}
+
+async function sendOrderConfirmationNotification(orderId, pharmacyId) {
+    try {
+        // Connect to the database to get pharmacy details if needed
         await client.connect();
-
-        const { id, name, description, price, pieces, dose, category } = req.body;
         const db = client.db("ImmunePlus");
-        const collection = db.collection("Products");
+        const pharmacyCollection = db.collection("Pharmacy");
 
-        let existing = await collection.findOne({ name });
+        // Fetch the pharmacy details
+        const pharmacy = await pharmacyCollection.findOne({ _id: pharmacyId });
 
-        if (existing) {
-            return res.status(400).json({ status: 'error', message: 'Product already exists' });
+        if (!pharmacy) {
+            console.error(`Pharmacy with ID ${pharmacyId} not found`);
+            return;
         }
 
-        let updateFields = { name, description, price };
+        // Emit the notification
+        global.io.emit('orderConfirmed', { orderId, pharmacyId, pharmacyName: pharmacy.name });
+        console.log(`Notification sent: Order ${orderId} confirmed for pharmacy ${pharmacy.name}`);
+    } catch (error) {
+        console.error("Error sending order confirmation notification:", error);
+    }
+}
 
-        if (typeof pieces === 'string') {
-            updateFields.pieces = pieces.split(',').map(item => parseFloat(item.trim()));
-        } else if (Array.isArray(pieces)) {
-            updateFields.pieces = pieces.map(item => parseFloat(item));
-        }
-
-        if (typeof dose === 'string') {
-            updateFields.dose = dose.split(',').map(item => parseFloat(item.trim()));
-        } else if (Array.isArray(dose)) {
-            updateFields.dose = dose.map(item => parseFloat(item));
-        }
-
-        if (typeof category === 'string') {
-            updateFields.category = category.split(',').map(item => parseFloat(item.trim()));
-        } else if (Array.isArray(category)) {
-            updateFields.category = category.map(item => parseFloat(item));
-        }
-
-        if (req.file && req.file.buffer) {
-            const filePath = path.join('uploads/product', req.file.originalname);
-            if (!fs.existsSync('uploads/product')) {
-                fs.mkdirSync('uploads/product', { recursive: true });
+function removeCircularReferences(obj) {
+    const seen = new WeakSet();
+    function internalRemove(obj) {
+        if (obj && typeof obj === 'object') {
+            if (seen.has(obj)) {
+                return;
             }
-            fs.writeFileSync(filePath, req.file.buffer);
-            updateFields.img = filePath;
+            seen.add(obj);
+            for (const key in obj) {
+                if (typeof obj[key] === 'object') {
+                    internalRemove(obj[key]);
+                }
+            }
         }
+    }
+    internalRemove(obj);
+    return obj;
+}
+
+async function changeOrderStatus(req, res) {
+    try {
+        const { orderId, status } = req.body;
+        const db = client.db("ImmunePlus");
+        const collection = db.collection("Orders");
+
+        let updateFields = { status };
 
         const result = await collection.updateOne(
-            { _id: parseInt(id) },
+            { _id: parseInt(orderId) },
             { $set: updateFields }
         );
 
         if (result.modifiedCount === 1) {
-            res.status(200).json({ status: 'success', message: 'Product Updated' });
+            // Fetch the updated order details
+            const updatedOrder = await collection.findOne({ _id: parseInt(orderId) });
+
+            // Emit the status change event to notify about the change
+            global.io.emit('orderStatusChanged', { orderId, status, updatedOrder });
+
+            console.log(`Order ${orderId} status changed to ${status}`);
+
+            // Send a confirmation notification to the user
+            await sendOrderStatusNotificationToUser(orderId, updatedOrder.userId, status);
+
+            // Send success response
+            res.status(200).json({ status: 'success', message: 'Status Updated' });
         } else {
-            res.status(400).json({ status: 'error', message: 'Update failed' });
+            res.status(400).json({ status: 'error', message: 'Status update failed' });
         }
     } catch (error) {
-        res.status(500).json({ message: 'Failed to update Product', error: error.message });
-    } finally {
-        await client.close();
+        res.status(500).json({ message: 'Failed to update status', error: error.message });
     }
 }
 
-// Controller function to delete a TypeOfTreatment
-async function remove(req, res) {
+async function sendOrderStatusNotificationToUser(orderId, userId, newStatus) {
     try {
-        const { id } = req.body;
         const db = client.db("ImmunePlus");
-        const collection = db.collection("Products");
+        const usersCollection = db.collection("Users");
 
-        const user = await collection.findOne({ _id: parseInt(id) });
-        console.log(user);
-        const result = await collection.deleteOne({ _id: parseInt(id) });
-        console.log(result);
-        if (result.deletedCount > 0) {
-            res.status(200).json({ status: 'success', message: 'Product Deleted' });
-        } else {
-            res.status(400).json({ status: 'error', message: 'Delete failed' });
+        // Fetch the user details
+        const user = await usersCollection.findOne({ _id: userId });
+
+        if (!user) {
+            console.error(`User with ID ${userId} not found`);
+            return;
         }
+
+        // Emit the notification
+        global.io.emit('orderStatusNotification', { orderId, userId, newStatus, userName: user.name });
+        console.log(`Notification sent: Order ${orderId} status changed to ${newStatus} for user ${user.fullName}`);
     } catch (error) {
-        res.status(500).json({ message: 'Failed to delete Product', error: error });
+        console.error("Error sending order status notification:", error);
     }
 }
+
+
+
 
 module.exports = {
     placeOrder,
-    getAllProducts,
-    upload,
-    update,
-    remove,
-    getOrderbyId
+    getOrderbyId,
+    receivePharmacyResponse,
+    changeOrderStatus
 };

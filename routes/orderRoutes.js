@@ -1,5 +1,5 @@
 const express = require('express');
-const { placeOrder, getAllProducts, upload, update,remove, getOrderbyId } = require('../controllers/orderController');
+const { placeOrder, getOrderbyId,receivePharmacyResponse, changeOrderStatus } = require('../controllers/orderController');
 
 const router = express.Router();
 
@@ -15,8 +15,7 @@ router.post('/create', async (req, res) => {
         res.status(500).json({ status: 'error', message: 'Order placement failed', reason: error.message });
     }
 });
-router.get('/records', getAllProducts);
-router.post('/update',upload.single('img'), update);
-router.post('/delete', remove);
 router.get('/id', getOrderbyId);
+router.post('/request', receivePharmacyResponse);
+router.post('/status', changeOrderStatus);
 module.exports = router;
