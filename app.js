@@ -57,20 +57,20 @@ io.on('connection', (socket) => {
     console.log('Server is running on port 5000');
   });
 
-// mongoose.connect('mongodb+srv://rsrisabhsingh212:Immuneplus123@immuneplus.v6jufn0.mongodb.net/ImmunePlus?retryWrites=true&w=majority', {
-//     useNewUrlParser: true,
-//     useUnifiedTopology: true
-// }).then(() => {
-//     console.log('Connected to MongoDB');
-//     app.listen(port, () => {
-//         console.log(`Server running on port ${port}`);
-//     });
-// }).catch(err => {
-//     console.error('Failed to connect to MongoDB', err);
-// });
+mongoose.connect('mongodb+srv://rsrisabhsingh212:Immuneplus123@immuneplus.v6jufn0.mongodb.net/ImmunePlus?retryWrites=true&w=majority', {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+}).then(() => {
+    console.log('Connected to MongoDB');
+    app.listen(port, () => {
+        console.log(`Server running on port ${port}`);
+    });
+}).catch(err => {
+    console.error('Failed to connect to MongoDB', err);
+});
 
-// app.listen(port, '0.0.0.0', () => {
-//     console.log(`Server is running on port ${port}`);
-// });
+app.listen(port, '0.0.0.0', () => {
+    console.log(`Server is running on port ${port}`);
+});
 
 
