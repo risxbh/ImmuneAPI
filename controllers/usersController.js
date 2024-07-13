@@ -63,7 +63,9 @@ async function loginUser(req, res) {
         } else {
             res.status(400).json({ status: 'error', message: 'Invalid email or password' });
         }
-    } 
+    } finally {
+        // await client.close();
+    }
 }
 
 // User registration controller
