@@ -25,7 +25,7 @@ const io = socketIo(server, {
         methods: ["GET", "POST"]
     }
 });
-const port = 5000;
+// const port = 5000;
 
 
 app.use(bodyParser.json());
@@ -53,24 +53,24 @@ io.on('connection', (socket) => {
   
   global.io = io;
   
-  server.listen(5000, () => {
-    console.log('Server is running on port 5000');
-  });
+  // server.listen(5000, () => {
+  //   console.log('Server is running on port 5000');
+  // });
 
 mongoose.connect('mongodb+srv://rsrisabhsingh212:Immuneplus123@immuneplus.v6jufn0.mongodb.net/ImmunePlus?retryWrites=true&w=majority', {
     useNewUrlParser: true,
     useUnifiedTopology: true
 }).then(() => {
     console.log('Connected to MongoDB');
-    app.listen(port, () => {
-        console.log(`Server running on port ${port}`);
-    });
+    // app.listen(port, () => {
+    //     console.log(`Server running on port ${port}`);
+    // });
 }).catch(err => {
     console.error('Failed to connect to MongoDB', err);
 });
 
-app.listen(port, '0.0.0.0', () => {
-    console.log(`Server is running on port ${port}`);
-});
+// app.listen(port, '0.0.0.0', () => {
+//     console.log(`Server is running on port ${port}`);
+// });
 
 
