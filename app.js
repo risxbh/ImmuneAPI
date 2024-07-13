@@ -24,10 +24,17 @@ const io = socketIo(server, {
     methods: ["GET", "POST"],
   },
 });
-const port = 8000;
+const port = 5000;
 
+// Configure CORS to allow requests from specific origins
+const corsOptions = {
+  origin: "https://immune-plus.netlify.app",
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
+
+app.use(cors(corsOptions));
 app.use(bodyParser.json());
-app.use(cors());
 
 app.use("/users", userRoutes);
 app.use("/ageGroups", ageGroupRoutes);
@@ -53,7 +60,11 @@ global.io = io;
 
 mongoose
   .connect(
-    "mongodb+srv://rsrisabhsingh212:Immuneplus123@immuneplus.v6jufn0.mongodb.net/ImmunePlus?retryWrites=true&w=majority"
+    "mongodb+srv://rsrisabhsingh212:Immuneplus123@immuneplus.v6jufn0.mongodb.net/ImmunePlus?retryWrites=true&w=majority",
+    {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    }
   )
   .then(() => {
     console.log("Connected to MongoDB");
