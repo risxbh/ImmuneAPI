@@ -2,7 +2,6 @@ const express = require("express");
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const mongoose = require("mongoose");
-const wss = require("./controllers/webSocket");
 const http = require("http");
 const socketIo = require("socket.io");
 
@@ -25,7 +24,7 @@ const io = socketIo(server, {
     methods: ["GET", "POST"],
   },
 });
-// const port = 5000;
+const port = 8000;
 
 app.use(bodyParser.json());
 app.use(cors());
@@ -52,25 +51,16 @@ io.on("connection", (socket) => {
 
 global.io = io;
 
-// server.listen(5000, () => {
-//   console.log('Server is running on port 5000');
-// });
-
 mongoose
   .connect(
-    "mongodb+srv://rsrisabhsingh212:Immuneplus123@immuneplus.v6jufn0.mongodb.net/ImmunePlus?retryWrites=true&w=majority",
-    {}
+    "mongodb+srv://rsrisabhsingh212:Immuneplus123@immuneplus.v6jufn0.mongodb.net/ImmunePlus?retryWrites=true&w=majority"
   )
   .then(() => {
     console.log("Connected to MongoDB");
-    // app.listen(port, () => {
-    //     console.log(`Server running on port ${port}`);
-    // });
+    server.listen(port, () => {
+      console.log(`Server running on port ${port}`);
+    });
   })
   .catch((err) => {
     console.error("Failed to connect to MongoDB", err);
   });
-
-// app.listen(port, '0.0.0.0', () => {
-//     console.log(`Server is running on port ${port}`);
-// });
