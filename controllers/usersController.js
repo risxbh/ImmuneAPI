@@ -64,7 +64,7 @@ async function loginUser(req, res) {
             res.status(400).json({ status: 'error', message: 'Invalid email or password' });
         }
     } finally {
-        await client.close();
+        // await client.close();
     }
 }
 
