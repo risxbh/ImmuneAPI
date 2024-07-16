@@ -21,117 +21,68 @@ const upload = multer({ storage });
 
 const mongoose = require('mongoose');
 
-async function createAvailabilitySchedule(doctorId, workingDays, workingHours, availableSlots) {
-    const today = new Date();
-    const dayMap = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-    const schedules = [];
-
-    const db = mongoose.connection;
-    const countersCollection = db.collection("Counters");
-
-    for (let i = 0; i < 7; i++) {
-        const date = new Date(today);
-        date.setDate(today.getDate() + i);
-        const dayOfWeek = date.getDay();
-
-        if (workingDays.includes(dayOfWeek)) {
-            const weekday = dayMap[dayOfWeek];
-
-            for (const hour of workingHours) {
-                const timeSlot = `${hour}:00`;
-                const slotsForTheDay = availableSlots[workingHours.indexOf(hour)] || 0;
-                const existingSchedule = await DoctorAvailability.findOne({ doctorId, date, time: timeSlot });
-
-                if (existingSchedule) {
-                    await DoctorAvailability.updateOne(
-                        { _id: existingSchedule._id },
-                        { $inc: { bookings: 1 } }
-                    );
-                } else {
-                    // Generate a custom ID based on the availability counter
-                    const counterAvailable = await countersCollection.findOneAndUpdate(
-                        { _id: "availableId" },
-                        { $inc: { seq: 1 } },
-                        { upsert: true, returnDocument: 'after' }
-                    );
-
-                    const newId = counterAvailable.seq.toString(16).padStart(24, '0'); // Convert to hex string
-
-                    schedules.push({
-                        _id: new mongoose.Types.ObjectId(newId), // Set custom ObjectId
-                        doctorId,
-                        date,
-                        weekday,
-                        time: timeSlot,
-                        availableSlots: slotsForTheDay,
-                        bookings: 0  // Start with 0 bookings
-                    });
-                }
-            }
-        }
-    }
-
-    await DoctorAvailability.insertMany(schedules);
-}
 async function bookAppointment(req, res) {
-    const { doctorId, date, time, patientId } = req.body;
-
-    if (!doctorId || !date || !time || !patientId) {
-        return res.status(400).json({ status: 'error', message: 'Doctor ID, date, time, and patient ID are required' });
-    }
-
     try {
         await client.connect();
+        const { scheduleId, patientId } = req.body;
         const db = client.db("ImmunePlus");
-        const collection = db.collection("doctoravailabilities");
+        const availabilitiesCollection = db.collection("doctoravailabilities");
+        const appointmentsCollection = db.collection("appointments");
         const countersCollection = db.collection("Counters");
 
-        const appointmentDate = new Date(date);
-        const timeSlot = `${time}`;
+        // Validate input
+        if (!scheduleId || !patientId) {
+            res.status(400).json({ status: 'error', message: 'Schedule ID and patient name are required' });
+            return;
+        }
 
-        // Find the availability schedule for the given doctor, date, and time
-        const availability = await collection.findOne({
-            doctorId,
-            date: appointmentDate,
-            time: timeSlot
+        // Find the schedule by its ID
+        const schedule = await availabilitiesCollection.findOne({
+            _id: scheduleId
         });
 
-        if (!availability) {
-            return res.status(404).json({ status: 'error', message: 'No availability found for the given date and time' });
+        if (!schedule) {
+            res.status(404).json({ status: 'error', message: 'No schedule found for the given ID' });
+            return;
         }
 
-        if (availability.availableSlots > 0) {
-            // Decrement the available slots and increment the bookings
-            await collection.updateOne(
-                { _id: availability._id },
-                { $inc: { availableSlots: -1, bookings: 1 } }
-            );
+        // Check if there are available slots
+        if (schedule.availableSlots <= 0) {
+            res.status(400).json({ status: 'error', message: 'No available slots for the given time' });
+            return;
+        }
 
-            // Generate a unique appointment ID
-            const counterAppointment = await countersCollection.findOneAndUpdate(
-                { _id: "appointmentId" },
-                { $inc: { seq: 1 } },
-                { upsert: true, returnDocument: 'after' }
-            );
-            const newAppointmentId = counterAppointment.seq; // Convert to string or use as number
+        // Decrement the available slots
+        await availabilitiesCollection.updateOne(
+            { _id: schedule._id },
+            { $inc: { availableSlots: -1 } }
+        );
 
-            // Insert the appointment record
-            const newAppointment = new Appointment({
-                _id: newAppointmentId,
-                doctorId,
-                date: appointmentDate,
-                time: timeSlot,
-                patientId
-            });
+        // Create the appointment record
+        const counter = await countersCollection.findOneAndUpdate(
+            { _id: "bookingId" },
+            { $inc: { seq: 1 } },
+            { upsert: true, returnDocument: 'after' }
+        );
+        const newId = counter.seq;
+        const appointment = {
+            _id: newId,
+            scheduleId: schedule._id,
+            doctorId: schedule.doctorId,
+            date: schedule.date,
+            time: schedule.time,
+            patientId: patientId,
+        };
 
-            await newAppointment.save();
+        const result = await appointmentsCollection.insertOne(appointment);
 
-            res.status(200).json({ status: 'success', message: 'Appointment booked successfully', appointmentId: newAppointmentId });
+        if (result.acknowledged === true) {
+            res.status(200).json({ status: 'success', message: 'Appointment booked successfully', bookingId: newId });
         } else {
-            res.status(400).json({ status: 'error', message: 'No available slots for the given date and time' });
+            res.status(400).json({ status: 'error', message: 'Failed to book appointment' });
         }
     } catch (error) {
-        res.status(500).json({ status: 'error', message: 'An error occurred during booking', reason: error.message });
+        res.status(500).json({ message: 'Failed to book appointment', error: error.message });
     } finally {
         await client.close();
     }
@@ -140,7 +91,7 @@ async function bookAppointment(req, res) {
 module.exports = bookAppointment;
 
 async function registerDoctor(req, res) {
-    const { name, hospital, about, type, patients, experience, rating, workinghours, availableSlots, location, specialist, workingDays, videoFee, appointmentFee, email, password } = req.body;
+    const { name, hospital, about, type, patients, experience, rating, location, specialist, videoFee, appointmentFee, email, password,workinghours } = req.body;
     let validations = [];
     let regex = /^(?=.*[0-9])(?=.*[!@#$%^&*])(?=.*[A-Z])(?=.*[a-z])/;
     let emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -173,13 +124,11 @@ async function registerDoctor(req, res) {
     if (!type) validations.push({ key: 'type', message: 'Type is required' });
     if (!patients) validations.push({ key: 'patients', message: 'Patients is required' });
     if (!experience) validations.push({ key: 'experience', message: 'Experience is required' });
-    if (!workinghours) validations.push({ key: 'workinghours', message: 'Working Hours is required' });
-    if (!availableSlots) validations.push({ key: 'availableSlots', message: 'Available Slots is required' });
     if (!specialist) validations.push({ key: 'specialist', message: 'specialist is required' });
-    if (!workingDays) validations.push({ key: 'workingDays', message: 'Working Days is required' });
     if (!videoFee) validations.push({ key: 'videoFee', message: 'Video Fee is required' });
     if (!appointmentFee) validations.push({ key: 'appointmentFee', message: 'Appointment Fee is required' });
     if (!location) validations.push({ key: 'location', message: 'Location is required' });
+    if (!workinghours) validations.push({ key: 'workinghours', message: 'Working Hours is required' });
 
     if (validations.length) {
         res.status(400).json({ status: 'error', validations: validations });
@@ -212,31 +161,25 @@ async function registerDoctor(req, res) {
                 { upsert: true, returnDocument: 'after' }
             );
             const newId = counter.seq;
-            const counterAvailable = await countersCollection.findOneAndUpdate(
-                { _id: "availableId" },
-                { $inc: { seq: 1 } },
-                { upsert: true, returnDocument: 'after' }
-            );
 
             // Parse workinghours and workingDays as arrays of integers
-            const parsedWorkingHours = workinghours.split(',').map(Number);
-            const parsedWorkingDays = workingDays.split(',').map(Number);
-            const parsedAvailableSlots = availableSlots.split(',').map(Number);
+            // const parsedWorkingHours = workinghours.split(',').map(Number);
+            // const parsedWorkingDays = workingDays.split(',').map(Number);
+            // const parsedAvailableSlots = availableSlots.split(',').map(Number);
 
-            const workingHoursData = await workingHoursCollection.find({ _id: { $in: parsedWorkingHours } }).toArray();
-            const workingDaysData = await workingDaysCollection.find({ _id: { $in: parsedWorkingDays } }).toArray();
+            // const workingHoursData = await workingHoursCollection.find({ _id: { $in: parsedWorkingHours } }).toArray();
+            // const workingDaysData = await workingDaysCollection.find({ _id: { $in: parsedWorkingDays } }).toArray();
 
-            const workingHoursNames = workingHoursData.map(item => item.name);
-            const workingDaysIndexes = workingDaysData.map(item => item.name);
+            // const workingHoursNames = workingHoursData.map(item => item.name);
+            // const workingDaysIndexes = workingDaysData.map(item => item.name);
 
             const result = await collection.insertOne({
                 password: hashedPassword,
-                name, hospital, about, type, patients, experience, rating, workinghours: workingHoursNames, availableSlots: parsedAvailableSlots, location, specialist, workingDays: workingDaysIndexes, videoFee, appointmentFee, email,
+                name, hospital, about, type, patients, experience, rating, location, specialist, videoFee, appointmentFee, email,workinghours,
                 _id: newId
             });
 
             if (result.acknowledged === true) {
-                await createAvailabilitySchedule(newId, parsedWorkingDays, workingHoursNames, parsedAvailableSlots);
                 return res.status(200).json({ status: 'success', message: 'Doctor registered successfully' });
             } else {
                 res.status(400).json({ status: 'error', message: 'Registration failed' });
@@ -248,6 +191,95 @@ async function registerDoctor(req, res) {
         await client.close();
     }
 }
+
+async function createSchedule(req, res) {
+    try {
+        await client.connect();
+        const { doctorId, date, workingHours, availableSlots } = req.body;
+        const db = client.db("ImmunePlus");
+        const collection = db.collection("doctoravailabilities");
+        const countersCollection = db.collection("Counters");
+
+        // Validations
+        let validations = [];
+        if (!doctorId) validations.push({ key: 'doctorId', message: 'Doctor ID is required' });
+        if (!date) validations.push({ key: 'date', message: 'Date is required' });
+        if (!workingHours || !Array.isArray(workingHours) || !workingHours.length) validations.push({ key: 'workingHours', message: 'Working hours are required and should be a non-empty array' });
+        if (!availableSlots || !Array.isArray(availableSlots) || !availableSlots.length) validations.push({ key: 'availableSlots', message: 'Available slots are required and should be a non-empty array' });
+        if (workingHours && availableSlots && workingHours.length !== availableSlots.length) validations.push({ key: 'mismatch', message: 'Working hours and available slots arrays must have the same length' });
+
+        if (validations.length) {
+            res.status(400).json({ status: 'error', validations: validations });
+            return;
+        }
+        const counter = await countersCollection.findOneAndUpdate(
+            { _id: "scheduleId" },
+            { $inc: { seq: 1 } },
+            { upsert: true, returnDocument: 'after' }
+        );
+        const newId = counter.seq;
+
+        // Create schedule records
+        const scheduleRecords = workingHours.map((time, index) => ({
+            _id: newId + index,
+            doctorId,
+            date: new Date(date),
+            time,
+            availableSlots: availableSlots[index]
+        }));
+
+        // Insert records into the database
+        const result = await collection.insertMany(scheduleRecords);
+
+        if (result.acknowledged === true) {
+            res.status(200).json({ status: 'success', message: 'Schedule created successfully' });
+        } else {
+            res.status(400).json({ status: 'error', message: 'Creation failed' });
+        }
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to create schedule', error: error.message });
+    } finally {
+        await client.close();
+    }
+    // dummyJSON:{
+    //     "doctorId": 67,
+    //     "date": "2024-06-21T04:25:56.731+00:00",
+    //     "workingHours": ["10:30", "11:00", "11:30"],
+    //     "availableSlots": [10, 5, 2]
+    // }
+    
+}
+async function filterSchedules(req, res) {
+    try {
+        await client.connect();
+        const { doctorId, date, time } = req.body;
+        const db = client.db("ImmunePlus");
+        const collection = db.collection("doctoravailabilities");
+
+        // Build the query object
+        let query = {};
+        if (doctorId) query.doctorId = parseInt(doctorId);
+        if (date) {
+            const start = new Date(date);
+            const end = new Date(date);
+            end.setDate(end.getDate() + 1);
+            query.date = { $gte: start, $lt: end };
+        }
+        if (time) query.time = time;
+
+        // Debugging output
+
+        // Fetch filtered records from the database
+        const result = await collection.find(query).toArray();
+
+        res.status(200).json(result);
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to filter schedules', error: error.message });
+    } finally {
+        await client.close();
+    }
+}
+
 
 async function loginDoctor(req, res) {
     const { email, password } = req.body;
@@ -462,5 +494,7 @@ module.exports = {
     getAllAvailableDocter,
     getDocterbyId,
     bookAppointment,
+    createSchedule,
+    filterSchedules,
     upload
 };

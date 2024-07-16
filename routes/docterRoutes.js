@@ -1,5 +1,5 @@
 const express = require('express');
-const { loginDoctor, registerDoctor, updateDoctor,upload, deleteDoctor,getAll,getAllAvailableDocter,getDocterbyId,bookAppointment } = require('../controllers/doctersController');
+const { loginDoctor, registerDoctor, updateDoctor,upload, deleteDoctor,getAll,getAllAvailableDocter,getDocterbyId,bookAppointment,createSchedule,filterSchedules } = require('../controllers/doctersController');
 
 const router = express.Router();
 
@@ -11,5 +11,7 @@ router.get('/records', getAll);
 router.get('/getAllAvailable', getAllAvailableDocter);
 router.get('/getById', getDocterbyId);
 router.post('/book', bookAppointment);
+router.post('/schedule', createSchedule);
+router.get('/filterSchedules', filterSchedules);
 
 module.exports = router;
