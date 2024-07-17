@@ -213,9 +213,9 @@ async function updateUser(req, res) {
         if (licenseNo) updatedFields.licenseNo = licenseNo;
         if (phoneNumber) updatedFields.phoneNumber = phoneNumber;
         if (req.file && req.file.buffer) {
-            const filePath = path.join('uploads/category', req.file.originalname);
-            if (!fs.existsSync('uploads/category')) {
-                fs.mkdirSync('uploads/category', { recursive: true });
+            const filePath = path.join('uploads/pharmacy', req.file.originalname);
+            if (!fs.existsSync('uploads/pharmacy')) {
+                fs.mkdirSync('uploads/pharmacy', { recursive: true });
             }
             fs.writeFileSync(filePath, req.file.buffer);
             updatedFields.licenseImg = filePath;
