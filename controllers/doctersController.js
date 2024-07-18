@@ -456,8 +456,15 @@ async function getAll(req, res) {
     }
 }
 
+async function connectToDatabase() {
+    if (!client.isConnected()) {
+        await client.connect();
+    }
+}
+
 async function getAllAvailableDocter(req, res) {
     try {
+        await connectToDatabase();
         const db = client.db("ImmunePlus");
         const collection = db.collection("doctoravailabilities");
         
