@@ -477,7 +477,7 @@ async function getDocterbyId(req, res) {
     try {
         const db = client.db("ImmunePlus");
         const collection = db.collection("doctoravailabilities");
-        const doctors = await collection.findOne({doctorId: parseInt(id) });
+        const doctors = await collection.find({ doctorId: parseInt(id) }).toArray();
         res.json(doctors);
     } catch (error) {
         res.status(500).json({ message: 'Failed to fetch doctors', error: error.message });

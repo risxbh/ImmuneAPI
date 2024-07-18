@@ -61,10 +61,6 @@ global.io = io;
 mongoose
   .connect(
     "mongodb+srv://rsrisabhsingh212:Immuneplus123@immuneplus.v6jufn0.mongodb.net/ImmunePlus?retryWrites=true&w=majority",
-    {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    }
   )
   .then(() => {
     console.log("Connected to MongoDB");
