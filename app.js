@@ -15,6 +15,8 @@ const workingHours = require("./routes/workingHours");
 const productRoutes = require("./routes/productRoutes");
 const pharmaRoutes = require("./routes/pharmaRoutes");
 const orderRoutes = require("./routes/orderRoutes");
+const posterRoutes = require("./routes/posterRoutes");
+const docterSpecRoutes = require("./routes/docterSpecRoutes");
 
 const app = express();
 const server = http.createServer(app);
@@ -48,6 +50,8 @@ app.use("/workingHours", workingHours);
 app.use("/product", productRoutes);
 app.use("/pharma", pharmaRoutes);
 app.use("/order", orderRoutes);
+app.use("/poster", posterRoutes);
+app.use("/docterSpec", docterSpecRoutes);
 
 io.on("connection", (socket) => {
   console.log("New client connected");

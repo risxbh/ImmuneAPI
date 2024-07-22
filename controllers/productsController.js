@@ -213,10 +213,32 @@ async function remove(req, res) {
     }
 }
 
+async function getProductById(req, res) {
+    const { id } = req.body;
+
+    if (!id) {
+        res.status(400).json({ status: 'error', message: 'Product ID is required' });
+        return;
+    }
+    try {
+        const db = client.db("ImmunePlus");
+        const collection = db.collection("Products");
+        const product = await collection.find({_id: parseInt(id) }).toArray();
+        if (product.length === 0) {
+            res.status(404).json({ status: 'error', message: 'Product not found' });
+        } else {
+            res.json(product);
+        }
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to fetch Product', error: error.message });
+    }
+}
+
 module.exports = {
     create,
     getAllProducts,
     upload,
     update,
-    remove
+    remove,
+    getProductById
 };

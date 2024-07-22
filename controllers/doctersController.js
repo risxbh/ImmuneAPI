@@ -5,15 +5,40 @@ const fs = require('fs');
 const path = require('path');
 const User = require('../models/User');
 const DoctorAvailability = require('../models/Availability');
-const Appointment = require('../models/Appointments')
+const Appointment = require('../models/Appointments');
+
 const url = 'mongodb+srv://rsrisabhsingh212:Immuneplus123@immuneplus.v6jufn0.mongodb.net/?retryWrites=true&w=majority&appName=ImmunePlus';
+
 let client = new MongoClient(url, {
     serverApi: {
         version: ServerApiVersion.v1,
         strict: true,
         deprecationErrors: true,
-        useNewUrlParser: true, useUnifiedTopology: true
+        useNewUrlParser: true,
+        useUnifiedTopology: true
     }
+});
+
+let isConnected = false;
+
+async function connectToDatabase() {
+    if (!isConnected) {
+        try {
+            await client.connect();
+            isConnected = true;
+            console.log('Connected to the database');
+        } catch (err) {
+            console.error('Failed to connect to the database', err);
+            throw err;
+        }
+    }
+}
+
+// Example usage of the connectToDatabase function
+connectToDatabase().then(() => {
+    // You can perform database operations here
+}).catch(err => {
+    console.error('Error connecting to the database:', err);
 });
 
 const storage = multer.memoryStorage();
@@ -23,6 +48,7 @@ const mongoose = require('mongoose');
 
 async function bookAppointment(req, res) {
     try {
+        await connectToDatabase();
         await client.connect();
         const { scheduleId, patientId } = req.body;
         const db = client.db("ImmunePlus");
@@ -194,6 +220,7 @@ async function registerDoctor(req, res) {
 
 async function createSchedule(req, res) {
     try {
+        await connectToDatabase();
         await client.connect();
         const { doctorId, date, workingHours, availableSlots } = req.body;
         const db = client.db("ImmunePlus");
@@ -251,6 +278,7 @@ async function createSchedule(req, res) {
 }
 async function filterSchedules(req, res) {
     try {
+        await connectToDatabase();
         await client.connect();
         const { doctorId, date, time } = req.body;
         const db = client.db("ImmunePlus");
@@ -295,6 +323,7 @@ async function loginDoctor(req, res) {
     }
 
     try {
+        await connectToDatabase();
         await client.connect();
         const db = client.db("ImmunePlus");
         const collection = db.collection("Doctors");
@@ -355,6 +384,7 @@ async function updateDoctor(req, res) {
     }
 
     try {
+        await connectToDatabase();
         await client.connect();
         const db = client.db("ImmunePlus");
         const collection = db.collection("Doctors");
@@ -419,6 +449,7 @@ async function deleteDoctor(req, res) {
     }
 
     try {
+        await connectToDatabase();
         await client.connect();
         const db = client.db("ImmunePlus");
         const collection = db.collection("Doctors");
@@ -446,6 +477,7 @@ async function deleteDoctor(req, res) {
 
 async function getAll(req, res) {
     try {
+        await connectToDatabase();
         const db = client.db("ImmunePlus");
         const collection = db.collection("Doctors");
         
@@ -453,12 +485,6 @@ async function getAll(req, res) {
         res.json(doctors);
     } catch (error) {
         res.status(500).json({ message: 'Failed to fetch doctors', error: error.message });
-    }
-}
-
-async function connectToDatabase() {
-    if (!client.isConnected()) {
-        await client.connect();
     }
 }
 
@@ -482,12 +508,32 @@ async function getDocterbyId(req, res) {
         return;
     }
     try {
+        await connectToDatabase();
         const db = client.db("ImmunePlus");
-        const collection = db.collection("doctoravailabilities");
-        const doctors = await collection.find({ doctorId: parseInt(id) }).toArray();
-        res.json(doctors);
+        const collection = db.collection("Doctors");
+        const doctors = await collection.find({ _id: parseInt(id) }).toArray();
+        if (doctors.length === 0) {
+            res.status(404).json({ status: 'error', message: 'Doctor not found' });
+        } else {
+            res.json(doctors);
+        }
     } catch (error) {
         res.status(500).json({ message: 'Failed to fetch doctors', error: error.message });
+    }
+}
+
+async function getTopRatedDoctors(req, res) {
+    try {
+        await connectToDatabase();
+        const db = client.db("ImmunePlus");
+        const collection = db.collection("Doctors");
+        
+        // Fetch doctors with a rating and sort them by rating in descending order
+        const doctors = await collection.find({ rating: { $ne: null } }).sort({ rating: -1 }).toArray();
+        
+        res.json(doctors);
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to fetch top-rated doctors', error: error.message });
     }
 }
 
@@ -503,5 +549,6 @@ module.exports = {
     bookAppointment,
     createSchedule,
     filterSchedules,
-    upload
+    upload,
+    getTopRatedDoctors
 };
