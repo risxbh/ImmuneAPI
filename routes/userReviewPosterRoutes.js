@@ -1,5 +1,5 @@
 const express = require('express');
-const { create, getAllPosters, upload,update,remove } = require('../controllers/posterController');
+const { create, getAllPosters, upload,update,remove } = require('../controllers/userReviewPosterController');
 
 const router = express.Router();
 

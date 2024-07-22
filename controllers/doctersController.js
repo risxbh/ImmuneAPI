@@ -280,7 +280,7 @@ async function filterSchedules(req, res) {
     try {
         await connectToDatabase();
         await client.connect();
-        const { doctorId, date, time } = req.body;
+        const { doctorId, date, time } = req.query;
         const db = client.db("ImmunePlus");
         const collection = db.collection("doctoravailabilities");
 
@@ -501,7 +501,7 @@ async function getAllAvailableDocter(req, res) {
     }
 }
 async function getDocterbyId(req, res) {
-    const { id } = req.body;
+    const { id } = req.query;
 
     if (!id) {
         res.status(400).json({ status: 'error', message: 'Docter ID is required' });

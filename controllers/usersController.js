@@ -280,10 +280,10 @@ async function getAll(req, res) {
 }
 
 async function getUserbyId(req, res) {
-    const { id } = req.body;
+    const { id } = req.query;
 
     if (!id) {
-        res.status(400).json({ status: 'error', message: 'Docter ID is required' });
+        res.status(400).json({ status: 'error', message: 'User ID is required' });
         return;
     }
     try {
@@ -301,7 +301,7 @@ async function getUserbyId(req, res) {
 }
 
 async function getUserAppointment(req, res) {
-    const { id } = req.body;
+    const { id } = req.query;
 
     if (!id) {
         res.status(400).json({ status: 'error', message: 'Docter ID is required' });

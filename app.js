@@ -15,7 +15,7 @@ const workingHours = require("./routes/workingHours");
 const productRoutes = require("./routes/productRoutes");
 const pharmaRoutes = require("./routes/pharmaRoutes");
 const orderRoutes = require("./routes/orderRoutes");
-const posterRoutes = require("./routes/posterRoutes");
+const userReviewPosterRoutes = require("./routes/userReviewPosterRoutes");
 const docterSpecRoutes = require("./routes/docterSpecRoutes");
 
 const app = express();
@@ -50,7 +50,7 @@ app.use("/workingHours", workingHours);
 app.use("/product", productRoutes);
 app.use("/pharma", pharmaRoutes);
 app.use("/order", orderRoutes);
-app.use("/poster", posterRoutes);
+app.use("/userReviewPoster", userReviewPosterRoutes);
 app.use("/docterSpec", docterSpecRoutes);
 
 io.on("connection", (socket) => {

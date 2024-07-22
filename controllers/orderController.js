@@ -96,7 +96,7 @@ async function placeOrder(req, res) {
 
 
 async function getOrderbyId(req, res) {
-    const { id } = req.body;
+    const { id } = req.query;
 
     if (!id) {
         res.status(400).json({ status: 'error', message: 'Order ID is required' });

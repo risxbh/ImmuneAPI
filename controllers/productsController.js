@@ -214,7 +214,7 @@ async function remove(req, res) {
 }
 
 async function getProductById(req, res) {
-    const { id } = req.body;
+    const { id } = req.query;
 
     if (!id) {
         res.status(400).json({ status: 'error', message: 'Product ID is required' });
