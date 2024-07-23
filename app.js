@@ -17,6 +17,7 @@ const pharmaRoutes = require("./routes/pharmaRoutes");
 const orderRoutes = require("./routes/orderRoutes");
 const userReviewPosterRoutes = require("./routes/userReviewPosterRoutes");
 const docterSpecRoutes = require("./routes/docterSpecRoutes");
+const deliveryRoutes = require("./routes/deliveryPartner")
 
 const app = express();
 const server = http.createServer(app);
@@ -30,7 +31,7 @@ const port = 5000;
 
 // Configure CORS to allow requests from specific origins
 const corsOptions = {
-  origin: ["https://immune-plus.netlify.app", 'http://localhost:8081', 'http://localhost:8082'],
+  origin: ["https://immune-plus.netlify.app", 'http://localhost:8081', 'http://localhost:8082','http://localhost:3000','http://localhost:3001'],
   methods: ["GET", "POST", "PUT", "DELETE"],
   allowedHeaders: ["Content-Type", "Authorization"],
 };
@@ -52,6 +53,7 @@ app.use("/pharma", pharmaRoutes);
 app.use("/order", orderRoutes);
 app.use("/userReviewPoster", userReviewPosterRoutes);
 app.use("/docterSpec", docterSpecRoutes);
+app.use("/delivery", deliveryRoutes);
 
 io.on("connection", (socket) => {
   console.log("New client connected");

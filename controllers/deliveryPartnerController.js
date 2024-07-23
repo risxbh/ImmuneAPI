@@ -15,16 +15,16 @@ let client = new MongoClient(url, {
         useNewUrlParser: true, useUnifiedTopology: true
     }
 });
+const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
 async function registerDelivery(req, res) {
     const { fullname, phoneNumber, address, licenseNo, experience, city, password } = req.body;
     let validations = [];
     let regex = /^(?=.*[0-9])(?=.*[!@#$%^&*])(?=.*[A-Z])(?=.*[a-z])/;
-    let emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     let passwordMessage = '';
-    let phoneNumMessage ='';
+    let phoneNumMessage = '';
 
     if (password) {
         if (password.length < 8 || password.length > 20) {
@@ -42,22 +42,22 @@ async function registerDelivery(req, res) {
         validations.push({ key: 'password', message: passwordMessage });
     }
 
-    if (!password) validations.push({ key: 'password', message: 'Password is required' });
-    if (!req.file || !req.file.buffer) validations.push({ key: 'licensePhoto', message: 'licensePhoto is required' });
+    if (!req.files || !req.files.licenseImg || !req.files.licenseImg[0].buffer) validations.push({ key: 'licensePhoto', message: 'licensePhoto is required' });
+    if (!req.files || !req.files.rcImg || !req.files.rcImg[0].buffer) validations.push({ key: 'rcPhoto', message: 'rcPhoto is required' });
     if (!fullname) validations.push({ key: 'fullname', message: 'Full Name is required' });
     if (!address) validations.push({ key: 'address', message: 'Address is required' });
     if (!licenseNo) validations.push({ key: 'licenseNo', message: 'License No is required' });
     if (!city) validations.push({ key: 'city', message: 'City is required' });
     if (!experience) validations.push({ key: 'experience', message: 'Experience is required' });
     if (phoneNumber) {
-        if (phoneNumber.length < 10 || phoneNumber.length > 10) {
-            phoneNumMessage = 'Phone Number should habe 10 digits.';
+        if (phoneNumber.length !== 10) {
+            phoneNumMessage = 'Phone Number should have 10 digits.';
         }
     } else {
         phoneNumMessage = 'Phone Number is required.';
     }
     if (phoneNumMessage) {
-        validations.push({ key: 'Phone Number', message: phoneNumMessage });
+        validations.push({ key: 'phoneNumber', message: phoneNumMessage });
     }
 
     if (validations.length) {
@@ -76,13 +76,6 @@ async function registerDelivery(req, res) {
         if (existingUser) {
             res.status(400).json({ status: 'error', message: 'Phone Number already exists' });
         } else {
-            const filePath = path.join('uploads/delivery', req.file.originalname);
-            if (!fs.existsSync('uploads/delivery')) {
-                fs.mkdirSync('uploads/delivery', { recursive: true });
-            }
-            fs.writeFileSync(filePath, req.file.buffer);
-            const hashedPassword = await bcrypt.hash(password, 10);
-
             const counter = await countersCollection.findOneAndUpdate(
                 { _id: "deliveryPartnerId" },
                 { $inc: { seq: 1 } },
@@ -90,14 +83,25 @@ async function registerDelivery(req, res) {
             );
             const newId = counter.seq;
 
+            const licenseFilePath = path.join('uploads/delivery/license',  `${newId}`);
+            const rcFilePath = path.join('uploads/delivery/rc',  `${newId}`);
+
+            if (!fs.existsSync('uploads/delivery')) {
+                fs.mkdirSync('uploads/delivery', { recursive: true });
+            }
+
+            fs.writeFileSync(licenseFilePath, req.files.licenseImg[0].buffer);
+            fs.writeFileSync(rcFilePath, req.files.rcImg[0].buffer);
+
+            const hashedPassword = await bcrypt.hash(password, 10);
+
             const result = await collection.insertOne({
-                password: hashedPassword,
-                name, phoneNumber, address, licenseNo, licensePhoto: filePath, experience, city, password,
-                _id: newId
+                _id: newId,
+                fullname, phoneNumber, address, licenseNo, licensePhoto: licenseFilePath, rcPhoto: rcFilePath, experience, city, password: hashedPassword
             });
 
-            if (result.acknowledged === true) {
-                return res.status(200).json({ status: 'success', message: 'Doctor registered successfully' });
+            if (result.acknowledged) {
+                res.status(200).json({ status: 'success', message: 'Delivery partner registered successfully' });
             } else {
                 res.status(400).json({ status: 'error', message: 'Registration failed' });
             }

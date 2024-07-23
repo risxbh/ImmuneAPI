@@ -95,22 +95,7 @@ async function placeOrder(req, res) {
 
 
 
-async function getOrderbyId(req, res) {
-    const { id } = req.query;
 
-    if (!id) {
-        res.status(400).json({ status: 'error', message: 'Order ID is required' });
-        return;
-    }
-    try {
-        const db = client.db("ImmunePlus");
-        const collection = db.collection("Orders");
-        const order = await collection.findOne({_id: parseInt(id) });
-        res.json(order);
-    } catch (error) {
-        res.status(500).json({ message: 'Failed to fetch order', error: error.message });
-    }
-}
 
 
 async function evaluateResponses(orderId) {
@@ -215,23 +200,21 @@ async function sendOrderConfirmationNotification(orderId, pharmacyId) {
     }
 }
 
-function removeCircularReferences(obj) {
-    const seen = new WeakSet();
-    function internalRemove(obj) {
-        if (obj && typeof obj === 'object') {
-            if (seen.has(obj)) {
-                return;
-            }
-            seen.add(obj);
-            for (const key in obj) {
-                if (typeof obj[key] === 'object') {
-                    internalRemove(obj[key]);
-                }
-            }
-        }
+async function getOrderbyId(req, res) {
+    const { id } = req.query;
+
+    if (!id) {
+        res.status(400).json({ status: 'error', message: 'Order ID is required' });
+        return;
     }
-    internalRemove(obj);
-    return obj;
+    try {
+        const db = client.db("ImmunePlus");
+        const collection = db.collection("Orders");
+        const order = await collection.findOne({_id: parseInt(id) });
+        res.json(order);
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to fetch order', error: error.message });
+    }
 }
 
 async function changeOrderStatus(req, res) {

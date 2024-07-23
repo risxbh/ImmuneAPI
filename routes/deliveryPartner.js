@@ -4,6 +4,7 @@ const { loginDelivery, registerDelivery, upload } = require('../controllers/deli
 const router = express.Router();
 
 router.post('/login', loginDelivery);
-router.post('/register', upload.single('licenseNo'), registerDelivery);
+router.post('/register', upload.fields([{ name: 'licenseImg' }, { name: 'rcImg' }]), registerDelivery);
+
 
 module.exports = router;
