@@ -79,9 +79,9 @@ async function placeOrder(req, res) {
             
             evaluateResponses(newOrderId);
             const pharmacies = await pharmacyCollection.find().toArray();
-            pharmacies.forEach(pharmacy => {
-                return global.io.emit('newOrder', { orderId: newOrderId, pharmacyId: pharmacy._id });
-            });
+      
+            return global.io.emit('newOrder', { orderId: newOrderId });
+                
             // Send success response to client
            // return res.status(200).json({ status: 'success', message: 'Order placed successfully', orderId: newOrderId });
         } else {
@@ -92,11 +92,6 @@ async function placeOrder(req, res) {
         res.status(500).json({ status: 'error', message: 'An error occurred during order placement', reason: error.message });
     }
 }
-
-
-
-
-
 
 async function evaluateResponses(orderId) {
     setTimeout(async () => {

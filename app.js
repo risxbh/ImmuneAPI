@@ -31,7 +31,7 @@ const port = 5000;
 
 // Configure CORS to allow requests from specific origins
 const corsOptions = {
-  origin: ["https://immune-plus.netlify.app", 'http://localhost:8081', 'http://localhost:8082','http://localhost:3000','http://localhost:3001'],
+  origin: "*",
   methods: ["GET", "POST", "PUT", "DELETE"],
   allowedHeaders: ["Content-Type", "Authorization"],
 };

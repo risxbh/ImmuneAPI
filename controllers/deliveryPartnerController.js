@@ -3,18 +3,18 @@ const { MongoClient, ServerApiVersion } = require('mongodb');
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
-const User = require('../models/User');
-const DoctorAvailability = require('../models/Availability');
-const Appointment = require('../models/Appointments')
 const url = 'mongodb+srv://rsrisabhsingh212:Immuneplus123@immuneplus.v6jufn0.mongodb.net/?retryWrites=true&w=majority&appName=ImmunePlus';
+
 let client = new MongoClient(url, {
     serverApi: {
         version: ServerApiVersion.v1,
         strict: true,
         deprecationErrors: true,
-        useNewUrlParser: true, useUnifiedTopology: true
+        useNewUrlParser: true,
+        useUnifiedTopology: true
     }
 });
+
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
@@ -42,8 +42,8 @@ async function registerDelivery(req, res) {
         validations.push({ key: 'password', message: passwordMessage });
     }
 
-    if (!req.files || !req.files.licenseImg || !req.files.licenseImg[0].buffer) validations.push({ key: 'licensePhoto', message: 'licensePhoto is required' });
-    if (!req.files || !req.files.rcImg || !req.files.rcImg[0].buffer) validations.push({ key: 'rcPhoto', message: 'rcPhoto is required' });
+    if (!req.files || !req.files.licensePhoto || !req.files.licensePhoto[0].buffer) validations.push({ key: 'licensePhoto', message: 'licensePhoto is required' });
+    if (!req.files || !req.files.rcPhoto || !req.files.rcPhoto[0].buffer) validations.push({ key: 'rcPhoto', message: 'rcPhoto is required' });
     if (!fullname) validations.push({ key: 'fullname', message: 'Full Name is required' });
     if (!address) validations.push({ key: 'address', message: 'Address is required' });
     if (!licenseNo) validations.push({ key: 'licenseNo', message: 'License No is required' });
@@ -83,15 +83,19 @@ async function registerDelivery(req, res) {
             );
             const newId = counter.seq;
 
-            const licenseFilePath = path.join('uploads/delivery/license',  `${newId}`);
-            const rcFilePath = path.join('uploads/delivery/rc',  `${newId}`);
+            const licenseFilePath = path.join('uploads/delivery/license', `${newId}`);
+            const rcFilePath = path.join('uploads/delivery/rc', `${newId}`);
 
-            if (!fs.existsSync('uploads/delivery')) {
-                fs.mkdirSync('uploads/delivery', { recursive: true });
+            if (!fs.existsSync('uploads/delivery/license')) {
+                fs.mkdirSync('uploads/delivery/license', { recursive: true });
             }
 
-            fs.writeFileSync(licenseFilePath, req.files.licenseImg[0].buffer);
-            fs.writeFileSync(rcFilePath, req.files.rcImg[0].buffer);
+            if (!fs.existsSync('uploads/delivery/rc')) {
+                fs.mkdirSync('uploads/delivery/rc', { recursive: true });
+            }
+
+            fs.writeFileSync(licenseFilePath, req.files.licensePhoto[0].buffer);
+            fs.writeFileSync(rcFilePath, req.files.rcPhoto[0].buffer);
 
             const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -120,16 +124,15 @@ async function loginDelivery(req, res) {
 
     if (!password) validations.push({ key: 'password', message: 'Password is required' });
     if (phoneNumber) {
-        if (phoneNumber.length < 10 || phoneNumber.length > 10) {
-            phoneNumMessage = 'Phone Number should habe 10 digits.';
+        if (phoneNumber.length !== 10) {
+            phoneNumMessage = 'Phone Number should have 10 digits.';
         }
     } else {
         phoneNumMessage = 'Phone Number is required.';
     }
     if (phoneNumMessage) {
-        validations.push({ key: 'Phone Number', message: phoneNumMessage });
+        validations.push({ key: 'phoneNumber', message: phoneNumMessage });
     }
-
 
     if (validations.length) {
         res.status(400).json({ status: 'error', validations: validations });
@@ -140,11 +143,12 @@ async function loginDelivery(req, res) {
         await client.connect();
         const db = client.db("ImmunePlus");
         const collection = db.collection("DeliveryPartner");
-        const user = await collection.findOne({ phoneNumber: phoneNumber });
+        const user = await collection.findOne({ phoneNumber });
 
         if (user) {
             const result = await bcrypt.compare(password, user.password);
             if (result) {
+    
                 const userInfo = {
                     fullName: user.fullName,
                     id: user._id,
@@ -154,21 +158,163 @@ async function loginDelivery(req, res) {
                     address: user.address,
                     experience: user.experience,
                     phoneNumber: user.phoneNumber,
+                    rcPhoto: user.rcPhoto
                 };
-                res.json({ status: 'success', message: 'Login successfull!', user: userInfo });
+                res.json({ status: 'success', message: 'Login successful!', user: userInfo });
             } else {
                 res.status(400).json({ status: 'error', message: 'Invalid Phone Number or password' });
             }
         } else {
-            res.status(400).json({ status: 'error', message: 'Invalid email or password' });
+            res.status(400).json({ status: 'error', message: 'Invalid Phone Number or password' });
         }
+    } catch (error) {
+        res.status(500).json({ status: 'error', message: 'An error occurred during login', reason: error.message });
     } finally {
-        // await client.close();
+        await client.close();
     }
 }
+
+async function updateDelivery(req, res) {
+    const { id, password, address, fullName, licenseNo, experience, city, phoneNumber } = req.body;
+    let validations = [];
+    let regex = /^(?=.*[0-9])(?=.*[!@#$%^&*])(?=.*[A-Z])(?=.*[a-z])/;
+
+    if (!id) validations.push({ key: 'id', message: 'Delivery Partner ID is required' });
+
+    if (password && (password.length < 8 || password.length > 20 || !regex.test(password))) {
+        validations.push({ key: 'password', message: 'Password should be between 8 to 20 characters, contain at least one number, one special character, and one uppercase letter.' });
+    }
+
+    if (validations.length) {
+        res.status(400).json({ status: 'error', validations: validations });
+        return;
+    }
+
+    try {
+        await client.connect();
+        const db = client.db("ImmunePlus");
+        const collection = db.collection("DeliveryPartner");
+
+        const user = await collection.findOne({ _id: parseInt(id) });
+  
+        if (!user) {
+            res.status(400).json({ status: 'error', message: 'Delivery Partner not found' });
+            return;
+        }
+
+        const updatedFields = {};
+        if (password) {
+            const hashedPassword = await bcrypt.hash(password, 10);
+            updatedFields.password = hashedPassword;
+        }
+        if (address) updatedFields.address = address;
+        if (fullName) updatedFields.fullName = fullName;
+        if (licenseNo) updatedFields.licenseNo = licenseNo;
+        if (experience) updatedFields.experience = experience;
+        if (city) updatedFields.city = city;
+        if (phoneNumber) updatedFields.phoneNumber = phoneNumber;
+
+        if (req.files) {
+            if (req.files.licensePhoto && req.files.licensePhoto[0]) {
+                const licenseFilePath = path.join('uploads/delivery/license', `${id}`);
+                fs.writeFileSync(licenseFilePath, req.files.licensePhoto[0].buffer);
+                updatedFields.licensePhoto = licenseFilePath;
+            }
+            if (req.files.rcPhoto && req.files.rcPhoto[0]) {
+                const rcFilePath = path.join('uploads/delivery/rc', `${id}`);
+                fs.writeFileSync(rcFilePath, req.files.rcPhoto[0].buffer);
+                updatedFields.rcPhoto = rcFilePath;
+            }
+        }
+
+        const result = await collection.updateOne({ _id: id }, { $set: updatedFields });
+        console.log(result);
+        if (result.modifiedCount > 0) {
+            res.status(200).json({ status: 'success', message: 'Delivery Partner updated successfully' });
+        } else {
+            res.status(400).json({ status: 'error', message: 'Failed to update user' });
+        }
+    } catch (error) {
+        res.status(500).json({ status: 'error', message: 'An error occurred during update', reason: error.message });
+    } finally {
+        await client.close();
+    }
+}
+
+// Delete user controller
+async function deleteDelivery(req, res) {
+    const { id } = req.body;
+
+    if (!id) {
+        res.status(400).json({ status: 'error', message: 'Delivery Partner ID is required' });
+        return;
+    }
+
+    try {
+        await client.connect();
+        const db = client.db("ImmunePlus");
+        const collection = db.collection("DeliveryPartner");
+
+        const user = await collection.findOne({ _id: parseInt(id) });
+
+        if (!user) {
+            res.status(400).json({ status: 'error', message: 'Delivery Partner not found' });
+            return;
+        }
+
+        const result = await collection.deleteOne({ _id: id });
+
+        if (result.deletedCount > 0) {
+            res.status(200).json({ status: 'success', message: 'Delivery Partner deleted successfully' });
+        } else {
+            res.status(400).json({ status: 'error', message: 'Failed to delete user' });
+        }
+    } catch (error) {
+        res.status(500).json({ status: 'error', message: 'An error occurred during deletion', reason: error });
+    } finally {
+        await client.close();
+    }
+}
+
+async function getAll(req, res) {
+    try {
+        const db = client.db("ImmunePlus");
+        const collection = db.collection("DeliveryPartner");
+        
+        const users = await collection.find().toArray();
+        res.json(users);
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to fetch users', error: error.message });
+    }
+}
+
+async function getUserbyId(req, res) {
+    const { id } = req.query;
+
+    if (!id) {
+        res.status(400).json({ status: 'error', message: 'Delivery Partner ID is required' });
+        return;
+    }
+    try {
+        const db = client.db("ImmunePlus");
+        const collection = db.collection("DeliveryPartner");
+        const user = await collection.find({ _id: parseInt(id) }).toArray();
+        if (user.length === 0) {
+            res.status(404).json({ status: 'error', message: 'Delivery Partner not found' });
+        } else {
+            res.json(user);
+        }
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to fetch Delivery Partner', error: error.message });
+    }
+}
+
 
 module.exports = {
     registerDelivery,
     loginDelivery,
+    updateDelivery,
+    deleteDelivery,
+    getAll,
     upload
 };
