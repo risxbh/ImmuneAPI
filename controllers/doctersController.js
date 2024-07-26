@@ -631,22 +631,46 @@ async function Dashboard(req, res) {
     const { id } = req.query;
 
     if (!id) {
-        res.status(400).json({ status: 'error', message: 'Docter ID is required' });
+        res.status(400).json({ status: 'error', message: 'Doctor ID is required' });
         return;
     }
     try {
         await connectToDatabase();
         const db = client.db("ImmunePlus");
         const collection = db.collection("doctoravailabilities");
-        
-        // Fetch doctors with a rating and sort them by rating in descending order
+
         const data = await collection.find({ doctorId: parseInt(id) }).toArray();
-        
-        res.json(doctors);
+
+        const today = new Date().toISOString().split('T')[0]; // Get today's date in YYYY-MM-DD format
+
+        const stats = data.reduce((acc, appointment) => {
+            // Ensure date is in string format
+            
+            const appointmentDate = new Date(appointment.date).toISOString().split('T')[0]; // Extract date in YYYY-MM-DD format
+
+            acc.totalAppointments += appointment.bookedClinic + appointment.bookedVideo;
+            acc.totalClinicBookings += appointment.bookedClinic;
+            acc.totalVideoBookings += appointment.bookedVideo;
+
+            if (appointmentDate === today) {
+                acc.totalAppointmentsToday += appointment.bookedClinic + appointment.bookedVideo;
+            }
+
+            return acc;
+        }, {
+            totalAppointments: 0,
+            totalAppointmentsToday: 0,
+            totalClinicBookings: 0,
+            totalVideoBookings: 0
+        });
+
+        res.json(stats);
     } catch (error) {
-        res.status(500).json({ message: 'Failed to fetch top-rated doctors', error: error.message });
+        res.status(500).json({ message: 'Failed to fetch data', error: error.message });
     }
 }
+
+
 
 
 module.exports = {
