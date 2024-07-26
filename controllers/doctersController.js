@@ -118,7 +118,7 @@ async function bookAppointment(req, res) {
     } catch (error) {
         res.status(500).json({ message: 'Failed to book appointment', error: error.message });
     } finally {
-        await client.close();
+        // await client.close();
     }
 }
 
@@ -222,7 +222,7 @@ async function registerDoctor(req, res) {
     } catch (error) {
         res.status(500).json({ status: 'error', message: 'An error occurred during registration', reason: error.message });
     } finally {
-        await client.close();
+        //await client.close();
     }
 }
 
@@ -279,7 +279,7 @@ async function createSchedule(req, res) {
     } catch (error) {
         res.status(500).json({ message: 'Failed to create schedule', error: error.message });
     } finally {
-        await client.close();
+        //await client.close();
     }
     // dummyJSON:{
     //     "doctorId": 67,
@@ -317,7 +317,7 @@ async function filterSchedules(req, res) {
     } catch (error) {
         res.status(500).json({ message: 'Failed to filter schedules', error: error.message });
     } finally {
-        await client.close();
+        //await client.close();
     }
 }
 
@@ -372,7 +372,7 @@ async function loginDoctor(req, res) {
             res.status(400).json({ status: 'error', message: 'Invalid Email or password' });
         }
     } finally {
-        await client.close();
+        //await client.close();
     }
 }
 
@@ -445,7 +445,7 @@ async function updateDoctor(req, res) {
     } catch (error) {
         res.status(500).json({ status: 'error', message: 'An error occurred during update', reason: error });
     } finally {
-        await client.close();
+        //await client.close();
     }
 } catch (error) {
     res.status(500).json({ message: 'Failed to update Doctor', error: error.message });
@@ -484,7 +484,7 @@ async function deleteDoctor(req, res) {
     } catch (error) {
         res.status(500).json({ status: 'error', message: 'An error occurred during deletion', reason: error });
     } finally {
-        await client.close();
+        //await client.close();
     }
 }
 
@@ -546,13 +546,28 @@ async function getSchedulebyId(req, res) {
         await connectToDatabase();
         const db = client.db("ImmunePlus");
         const collection = db.collection("doctoravailabilities");
-        const doctors = await collection.find({ doctorId: parseInt(id) }).toArray();
+        const schedule = await collection.find({ doctorId: parseInt(id) }).toArray();
 
-        if (doctors.length === 0) {
+        if (schedule.length === 0) {
             res.status(404).json({ status: 'error', message: 'No Data found' });
-        } else {
-            res.json(doctors);
+            return;
         }
+
+        // Group and format the schedule by date
+        const formattedSchedule = schedule.reduce((acc, curr) => {
+            const dateStr = new Date(curr.date).toDateString(); // Format date
+            const existingDate = acc.find(item => item.date === dateStr);
+
+            if (existingDate) {
+                existingDate.info.push(curr);
+            } else {
+                acc.push({ date: dateStr, info: [curr] });
+            }
+
+            return acc;
+        }, []);
+
+        res.json(formattedSchedule);
     } catch (error) {
         res.status(500).json({ message: 'Failed to fetch Data', error: error.message });
     }
@@ -569,13 +584,28 @@ async function getAppointmentbyId(req, res) {
         await connectToDatabase();
         const db = client.db("ImmunePlus");
         const collection = db.collection("appointments");
-        const doctors = await collection.find({ doctorId: parseInt(id) }).toArray();
+        const appointments = await collection.find({ doctorId: parseInt(id) }).toArray();
 
-        if (doctors.length === 0) {
+        if (appointments.length === 0) {
             res.status(404).json({ status: 'error', message: 'No Data found' });
-        } else {
-            res.json(doctors);
+            return;
         }
+
+        // Group and format the appointments by date
+        const formattedAppointments = appointments.reduce((acc, curr) => {
+            const dateStr = new Date(curr.date).toDateString(); // Format date
+            const existingDate = acc.find(item => item.date === dateStr);
+            console.log(existingDate, dateStr);
+            if (existingDate) {
+                existingDate.info.push(curr);
+            } else {
+                acc.push({ date: dateStr, info: [curr] });
+            }
+
+            return acc;
+        }, []);
+
+        res.json(formattedAppointments);
     } catch (error) {
         res.status(500).json({ message: 'Failed to fetch Data', error: error.message });
     }
@@ -590,6 +620,27 @@ async function getTopRatedDoctors(req, res) {
         
         // Fetch doctors with a rating and sort them by rating in descending order
         const doctors = await collection.find({ rating: { $ne: null } }).sort({ rating: -1 }).toArray();
+        
+        res.json(doctors);
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to fetch top-rated doctors', error: error.message });
+    }
+}
+
+async function Dashboard(req, res) {
+    const { id } = req.query;
+
+    if (!id) {
+        res.status(400).json({ status: 'error', message: 'Docter ID is required' });
+        return;
+    }
+    try {
+        await connectToDatabase();
+        const db = client.db("ImmunePlus");
+        const collection = db.collection("doctoravailabilities");
+        
+        // Fetch doctors with a rating and sort them by rating in descending order
+        const data = await collection.find({ doctorId: parseInt(id) }).toArray();
         
         res.json(doctors);
     } catch (error) {
@@ -612,5 +663,6 @@ module.exports = {
     upload,
     getTopRatedDoctors,
     getSchedulebyId,
-    getAppointmentbyId
+    getAppointmentbyId,
+    Dashboard
 };
