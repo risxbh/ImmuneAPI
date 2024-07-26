@@ -78,7 +78,7 @@ async function placeOrder(req, res) {
         if (result.acknowledged) {
             
             evaluateResponses(newOrderId);
-            const pharmacies = await pharmacyCollection.find().toArray();
+            // const pharmacies = await pharmacyCollection.find().toArray();
       
             return global.io.emit('newOrder', { orderId: newOrderId });
                 

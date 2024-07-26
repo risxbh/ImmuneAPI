@@ -50,15 +50,15 @@ async function bookAppointment(req, res) {
     try {
         await connectToDatabase();
         await client.connect();
-        const { scheduleId, patientId } = req.body;
+        const { scheduleId, patientId, type } = req.body;
         const db = client.db("ImmunePlus");
         const availabilitiesCollection = db.collection("doctoravailabilities");
         const appointmentsCollection = db.collection("appointments");
         const countersCollection = db.collection("Counters");
 
         // Validate input
-        if (!scheduleId || !patientId) {
-            res.status(400).json({ status: 'error', message: 'Schedule ID and patient name are required' });
+        if (!scheduleId || !patientId || !type) {
+            res.status(400).json({ status: 'error', message: 'Schedule ID, Type of Appointment and patient name are required' });
             return;
         }
 
@@ -79,10 +79,17 @@ async function bookAppointment(req, res) {
         }
 
         // Decrement the available slots
-        await availabilitiesCollection.updateOne(
+        if(type ==1){
+        await availabilitiesCollection.updateMany(
             { _id: schedule._id },
-            { $inc: { availableSlots: -1 } }
+            { $inc: { availableSlots: -1, bookedClinic: +1 } }
         );
+    }else{
+        await availabilitiesCollection.updateMany(
+            { _id: schedule._id },
+            { $inc: { availableSlots: -1, bookedVideo: +1 } }
+        );
+    }
 
         // Create the appointment record
         const counter = await countersCollection.findOneAndUpdate(
@@ -98,6 +105,7 @@ async function bookAppointment(req, res) {
             date: schedule.date,
             time: schedule.time,
             patientId: patientId,
+            type:type
         };
 
         const result = await appointmentsCollection.insertOne(appointment);
@@ -239,20 +247,25 @@ async function createSchedule(req, res) {
             res.status(400).json({ status: 'error', validations: validations });
             return;
         }
+        const incrementAmount = workingHours.length;
         const counter = await countersCollection.findOneAndUpdate(
             { _id: "scheduleId" },
-            { $inc: { seq: 1 } },
+            { $inc: { seq: incrementAmount  } },
             { upsert: true, returnDocument: 'after' }
         );
         const newId = counter.seq;
+        const baseId = counter.seq - incrementAmount + 1;
 
         // Create schedule records
         const scheduleRecords = workingHours.map((time, index) => ({
-            _id: newId + index,
+            _id: baseId + index,
             doctorId,
             date: new Date(date),
             time,
-            availableSlots: availableSlots[index]
+            availableSlots: availableSlots[index],
+            totalslots:  availableSlots[index],
+            bookedClinic: 0,
+            bookedVideo: 0,
         }));
 
         // Insert records into the database
@@ -522,6 +535,53 @@ async function getDocterbyId(req, res) {
     }
 }
 
+async function getSchedulebyId(req, res) {
+    const { id } = req.query;
+
+    if (!id) {
+        res.status(400).json({ status: 'error', message: 'Docter ID is required' });
+        return;
+    }
+    try {
+        await connectToDatabase();
+        const db = client.db("ImmunePlus");
+        const collection = db.collection("doctoravailabilities");
+        const doctors = await collection.find({ doctorId: parseInt(id) }).toArray();
+
+        if (doctors.length === 0) {
+            res.status(404).json({ status: 'error', message: 'No Data found' });
+        } else {
+            res.json(doctors);
+        }
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to fetch Data', error: error.message });
+    }
+}
+
+async function getAppointmentbyId(req, res) {
+    const { id } = req.query;
+
+    if (!id) {
+        res.status(400).json({ status: 'error', message: 'Docter ID is required' });
+        return;
+    }
+    try {
+        await connectToDatabase();
+        const db = client.db("ImmunePlus");
+        const collection = db.collection("appointments");
+        const doctors = await collection.find({ doctorId: parseInt(id) }).toArray();
+
+        if (doctors.length === 0) {
+            res.status(404).json({ status: 'error', message: 'No Data found' });
+        } else {
+            res.json(doctors);
+        }
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to fetch Data', error: error.message });
+    }
+}
+
+
 async function getTopRatedDoctors(req, res) {
     try {
         await connectToDatabase();
@@ -550,5 +610,7 @@ module.exports = {
     createSchedule,
     filterSchedules,
     upload,
-    getTopRatedDoctors
+    getTopRatedDoctors,
+    getSchedulebyId,
+    getAppointmentbyId
 };

@@ -119,7 +119,6 @@ async function loginUser(req, res) {
     let phoneNumMessage = '';
 
     if (!password) validations.push({ key: 'password', message: 'Password is required' });
-    if (!req.file || !req.file.buffer) validations.push({ key: 'img', message: 'Image is required' });
     if (phoneNumber) {
         if (phoneNumber.length < 10 || phoneNumber.length > 10) {
             phoneNumMessage = 'Phone Number should habe 10 digits.';
