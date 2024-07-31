@@ -31,7 +31,8 @@ async function placeOrder(req, res) {
         const db = client.db("ImmunePlus");
         const ordersCollection = db.collection("Orders");
         const countersCollection = db.collection("Counters");
-        const pharmacyCollection = db.collection("Pharmacy");
+        const paymentCollection = db.collection("payments");
+
 
         // Validate the product details
         let validations = [];
@@ -48,15 +49,22 @@ async function placeOrder(req, res) {
             return res.status(400).json({ status: 'error', validations });
         }
 
-        // Get and increment the counter for Orders
         const counter = await countersCollection.findOneAndUpdate(
             { _id: "orderId" },
             { $inc: { seq: 1 } },
             { upsert: true, returnDocument: 'after' }
         );
-        const newOrderId = counter.seq; // Generate a new ObjectId for the order
+        const newOrderId = counter.seq;
+        const counter2 = await countersCollection.findOneAndUpdate(
+            { _id: "payementId" },
+            { $inc: { seq: 1 } },
+            { upsert: true, returnDocument: 'after' }
+        );
+        const newPayementId = counter2.seq; // Generate a new ObjectId for the order
 
         // Insert the order
+        let totalPrice = products.reduce((total, item) => total + item.price, 0);
+        let amountToBePaid = totalPrice - (totalPrice * 15) / 100;
         const order = {
             _id: newOrderId,
             userId,
@@ -71,23 +79,40 @@ async function placeOrder(req, res) {
             location,
             status: 0,
             date: new Date(),
+            assignedPharmacy: null,
+            totalPrice: totalPrice
+        };
+
+
+        // Insert the order
+        const paymentInfo = {
+            _id: newPayementId,
+            userId,
+            orderId: newOrderId,
+            totalPrice: totalPrice,
+            type: 1,
+            date: new Date(),
+            PartnerId: null,
+            status: 0,
+            amountToBePaid: amountToBePaid
         };
 
         const result = await ordersCollection.insertOne(order);
+        const result2 = await paymentCollection.insertOne(paymentInfo);
 
-        if (result.acknowledged) {
-            
+
+        if (result.acknowledged && result2.acknowledged) {
+
             evaluateResponses(newOrderId);
             // const pharmacies = await pharmacyCollection.find().toArray();
-      
-            return global.io.emit('newOrder', { orderId: newOrderId });
-                
+
+            global.io.emit('newOrder', { orderId: newOrderId });
             // Send success response to client
-           // return res.status(200).json({ status: 'success', message: 'Order placed successfully', orderId: newOrderId });
+            return res.status(200).json({ status: 'success', message: 'Order placed successfully', orderId: newOrderId });
         } else {
             throw new Error('Failed to place order');
         }
-        
+
     } catch (error) {
         res.status(500).json({ status: 'error', message: 'An error occurred during order placement', reason: error.message });
     }
@@ -95,7 +120,7 @@ async function placeOrder(req, res) {
 
 async function evaluateResponses(orderId) {
     setTimeout(async () => {
-        console.log(responses);
+
         if (responses.has(orderId)) {
             const orderResponses = responses.get(orderId);
             let bestPharmacy = null;
@@ -132,8 +157,11 @@ async function assignOrderToPharmacy(orderId, pharmacyId) {
         await client.connect();
         const db = client.db("ImmunePlus");
         const ordersCollection = db.collection("Orders");
+        const paymentCollection = db.collection("payments");
+
 
         await ordersCollection.updateOne({ _id: orderId }, { $set: { assignedPharmacy: pharmacyId, status: 1 } });
+        await paymentCollection.updateOne({orderId: orderId }, { $set: { PartnerId: pharmacyId, status: 1 } });
 
         global.io.emit('orderAssigned', { orderId, pharmacyId });
         console.log(`Order ${orderId} assigned to pharmacy ${pharmacyId}`);
@@ -152,7 +180,7 @@ async function receivePharmacyResponse(req, res) {
     if (!orderId || !pharmacyId || !Array.isArray(products)) {
         return res.status(400).json({ status: 'error', message: 'orderId, pharmacyId, and products are required' });
     }
-    
+
     try {
         if (!responses.has(orderId)) {
             responses.set(orderId, []);
@@ -205,7 +233,7 @@ async function getOrderbyId(req, res) {
     try {
         const db = client.db("ImmunePlus");
         const collection = db.collection("Orders");
-        const order = await collection.findOne({_id: parseInt(id) });
+        const order = await collection.findOne({ _id: parseInt(id) });
         res.json(order);
     } catch (error) {
         res.status(500).json({ message: 'Failed to fetch order', error: error.message });
@@ -267,6 +295,17 @@ async function sendOrderStatusNotificationToUser(orderId, userId, newStatus) {
         console.error("Error sending order status notification:", error);
     }
 }
+async function getAll(req, res) {
+    try {
+        const db = client.db("ImmunePlus");
+        const collection = db.collection("Orders");
+
+        const orders = await collection.find().toArray();
+        res.json(orders);
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to fetch Orders', error: error.message });
+    }
+}
 
 
 
@@ -275,5 +314,6 @@ module.exports = {
     placeOrder,
     getOrderbyId,
     receivePharmacyResponse,
-    changeOrderStatus
+    changeOrderStatus,
+    getAll
 };

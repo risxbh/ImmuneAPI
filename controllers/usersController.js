@@ -158,7 +158,6 @@ async function registerUser(req, res) {
                 _id: newId
             });
            
-            console.log(result);
             if (result.acknowledged === true) {
                 return res.status(200).json({ status: 'success', message: 'User registered successfully' });
             } else {

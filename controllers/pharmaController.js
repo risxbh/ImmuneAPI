@@ -281,11 +281,136 @@ async function getAll(req, res) {
     }
 }
 
+async function Dashboard(req, res) {
+    const { id } = req.query;
+
+    if (!id) {
+        res.status(400).json({ status: 'error', message: 'Pharamcy ID is required' });
+        return;
+    }
+    try {
+        await connectToDatabase();
+        const db = client.db("ImmunePlus");
+        const collection = db.collection("Orders");
+
+        const data = await collection.find({ assignedPharmacy: parseInt(id) }).toArray();
+
+        const today = new Date().toISOString().split('T')[0];
+
+        const stats = data.reduce((acc, order) => {
+            // Ensure date is in string format
+            const orderDate = new Date(order.date).toISOString().split('T')[0]; // Extract date in YYYY-MM-DD format
+
+            acc.totalOrders += 1;
+
+            if (order.status > 0 && order.status <= 4) {
+                acc.runingOrder += 1;
+            }
+            if (orderDate === today) {
+                acc.todayOrder += 1;
+
+            }
+        
+            if (Array.isArray(order.products)) {
+                acc.money += order.products.reduce((total, item) => total + item.price, 0);
+            }
+            return acc;
+        }, {
+            totalOrders: 0,
+            todayOrder: 0,
+            runingOrder: 0,
+            money: 0
+        });
+
+        res.json(stats);
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to fetch data', error: error.message });
+    }
+}
+
+async function getOngoingOrder(req, res) {
+    const { id } = req.query;
+
+    if (!id) {
+        res.status(400).json({ status: 'error', message: 'Pharamcy ID is required' });
+        return;
+    }
+    try {
+        await connectToDatabase();
+        const db = client.db("ImmunePlus");
+        const collection = db.collection("Orders");
+
+        const orders = await collection.find({ 
+            status: { $gte: 1, $lte: 4 },
+            assignedPharmacy: parseInt(id)
+        }).toArray();
+
+        res.json(orders);
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to fetch data', error: error.message });
+    }
+}
+let isConnected = false;
+
+async function connectToDatabase() {
+    if (!isConnected) {
+        try {
+            await client.connect();
+            isConnected = true;
+            console.log('Connected to the database');
+        } catch (err) {
+            console.error('Failed to connect to the database', err);
+            throw err;
+        }
+    }
+}
+
+async function getOrderbyId(req, res) {
+    const { id } = req.query;
+
+    if (!id) {
+        res.status(400).json({ status: 'error', message: 'Docter ID is required' });
+        return;
+    }
+    try {
+        await connectToDatabase();
+        const db = client.db("ImmunePlus");
+        const collection = db.collection("Orders");
+        const orders = await collection.find({ assignedPharmacy: parseInt(id) }).toArray();
+
+        if (orders.length === 0) {
+            res.status(404).json({ status: 'error', message: 'No Data found' });
+            return;
+        }
+
+        // Group and format the orders by date
+        const formattedOrders = orders.reduce((acc, curr) => {
+            const dateStr = new Date(curr.date).toDateString(); // Format date
+            const existingDate = acc.find(item => item.date === dateStr);
+
+            if (existingDate) {
+                existingDate.info.push(curr);
+            } else {
+                acc.push({ date: dateStr, info: [curr] });
+            }
+
+            return acc;
+        }, []);
+
+        res.json(formattedOrders);
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to fetch Data', error: error.message });
+    }
+}
+
 module.exports = {
     loginUser,
     registerUser,
     updateUser,
     deleteUser,
     getAll,
-    upload
+    Dashboard,
+    upload,
+    getOngoingOrder,
+    getOrderbyId
 };
