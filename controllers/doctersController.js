@@ -55,6 +55,8 @@ async function bookAppointment(req, res) {
         const availabilitiesCollection = db.collection("doctoravailabilities");
         const appointmentsCollection = db.collection("appointments");
         const countersCollection = db.collection("Counters");
+        const paymentCollection = db.collection("paymentDocter");
+        const docterCollection = db.collection("Doctors");
 
         // Validate input
         if (!scheduleId || !patientId || !type) {
@@ -65,6 +67,9 @@ async function bookAppointment(req, res) {
         // Find the schedule by its ID
         const schedule = await availabilitiesCollection.findOne({
             _id: scheduleId
+        });
+        const docter = await docterCollection.findOne({
+            _id: schedule.doctorId
         });
 
         if (!schedule) {
@@ -98,6 +103,19 @@ async function bookAppointment(req, res) {
             { upsert: true, returnDocument: 'after' }
         );
         const newId = counter.seq;
+        const counter2 = await countersCollection.findOneAndUpdate(
+            { _id: "paymentId" },
+            { $inc: { seq: 1 } },
+            { upsert: true, returnDocument: 'after' }
+        );
+        const newPayementId = counter2.seq;
+        const dateInIST = new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" });
+        let totalAmount
+        if(type == 1){
+            totalAmount = docter.appointmentFee
+        }else if(type ==2){
+            totalAmount = docter.videoFee
+        }
         const appointment = {
             _id: newId,
             scheduleId: schedule._id,
@@ -108,9 +126,24 @@ async function bookAppointment(req, res) {
             type:type
         };
 
-        const result = await appointmentsCollection.insertOne(appointment);
+        const paymentInfo = {
+            _id: newPayementId,
+            bookingId: newId,
+            userId:patientId,
+            doctorId: schedule.doctorId,
+            date: schedule.date,
+            time: schedule.time,
+            type: 2,
+            createdAt: dateInIST,
+            status: 0,
+            totalAmount: totalAmount,
+            amountToBePaid: totalAmount
+        };
 
-        if (result.acknowledged === true) {
+        const result = await appointmentsCollection.insertOne(appointment);
+        const result2 = await paymentCollection.insertOne(paymentInfo);
+
+        if (result.acknowledged === true && result2.acknowledged == true) {
             res.status(200).json({ status: 'success', message: 'Appointment booked successfully', bookingId: newId });
         } else {
             res.status(400).json({ status: 'error', message: 'Failed to book appointment' });

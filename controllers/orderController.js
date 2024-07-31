@@ -31,7 +31,7 @@ async function placeOrder(req, res) {
         const db = client.db("ImmunePlus");
         const ordersCollection = db.collection("Orders");
         const countersCollection = db.collection("Counters");
-        const paymentCollection = db.collection("payments");
+        const paymentCollection = db.collection("paymentOrder");
         const availableOrderCollection = db.collection("ongoingOrders");
 
         let validations = [];
@@ -189,7 +189,7 @@ async function assignOrderToPharmacy(orderId, pharmacyId) {
         await client.connect();
         const db = client.db("ImmunePlus");
         const ordersCollection = db.collection("Orders");
-        const paymentCollection = db.collection("payments");
+        const paymentCollection = db.collection("paymentOrder");
         const availableOrderCollection = db.collection("ongoingOrders");
 
         await ordersCollection.updateOne({ _id: orderId }, { $set: { assignedPharmacy: pharmacyId, status: 1 } });

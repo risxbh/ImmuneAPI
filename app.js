@@ -18,6 +18,8 @@ const orderRoutes = require("./routes/orderRoutes");
 const userReviewPosterRoutes = require("./routes/userReviewPosterRoutes");
 const docterSpecRoutes = require("./routes/docterSpecRoutes");
 const deliveryRoutes = require("./routes/deliveryPartner")
+const paymentBookingRoutes = require("./routes/paymentBookingRoutes")
+const paymentOrderRoutes = require("./routes/paymentOrderRoutes")
 
 const app = express();
 const server = http.createServer(app);
@@ -54,6 +56,8 @@ app.use("/order", orderRoutes);
 app.use("/userReviewPoster", userReviewPosterRoutes);
 app.use("/docterSpec", docterSpecRoutes);
 app.use("/delivery", deliveryRoutes);
+app.use("/paymentBooking", paymentBookingRoutes);
+app.use("/paymentOrder", paymentOrderRoutes);
 
 io.on("connection", (socket) => {
   console.log("New client connected");
