@@ -32,9 +32,8 @@ async function placeOrder(req, res) {
         const ordersCollection = db.collection("Orders");
         const countersCollection = db.collection("Counters");
         const paymentCollection = db.collection("payments");
+        const availableOrderCollection = db.collection("ongoingOrders");
 
-
-        // Validate the product details
         let validations = [];
         products.forEach((product, index) => {
             if (!product.productId) validations.push({ key: `products[${index}].productId`, message: 'Product ID is required' });
@@ -49,130 +48,73 @@ async function placeOrder(req, res) {
             return res.status(400).json({ status: 'error', validations });
         }
 
-        const counter = await countersCollection.findOneAndUpdate(
-            { _id: "orderId" },
-            { $inc: { seq: 1 } },
-            { upsert: true, returnDocument: 'after' }
-        );
-        const newOrderId = counter.seq;
-        const counter2 = await countersCollection.findOneAndUpdate(
-            { _id: "payementId" },
-            { $inc: { seq: 1 } },
-            { upsert: true, returnDocument: 'after' }
-        );
-        const newPayementId = counter2.seq; // Generate a new ObjectId for the order
+        const session = client.startSession();
+        let newOrderId, newPayementId;
+        await session.withTransaction(async () => {
+            const counter = await countersCollection.findOneAndUpdate(
+                { _id: "orderId" },
+                { $inc: { seq: 1 } },
+                { upsert: true, returnDocument: 'after' }
+            );
+            newOrderId = counter.seq;
+            
+            const counter2 = await countersCollection.findOneAndUpdate(
+                { _id: "payementId" },
+                { $inc: { seq: 1 } },
+                { upsert: true, returnDocument: 'after' }
+            );
+            newPayementId = counter2.seq;
+            
+            let totalPrice = products.reduce((total, item) => total + item.price, 0);
+            let amountToBePaid = totalPrice - (totalPrice * 15) / 100;
+            const dateInIST = new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" });
+            const order = {
+                _id: newOrderId,
+                userId,
+                products: products.map(product => ({
+                    productId: parseFloat(product.productId),
+                    name: product.name,
+                    price: parseFloat(product.price),
+                    pieces: parseFloat(product.pieces),
+                    dose: parseFloat(product.dose),
+                    quantity: parseInt(product.quantity),
+                })),
+                location,
+                status: 0,
+                date: dateInIST,
+                assignedPharmacy: null,
+                totalPrice: totalPrice
+            };
 
-        // Insert the order
-        let totalPrice = products.reduce((total, item) => total + item.price, 0);
-        let amountToBePaid = totalPrice - (totalPrice * 15) / 100;
-        const order = {
-            _id: newOrderId,
-            userId,
-            products: products.map(product => ({
-                productId: parseFloat(product.productId),
-                name: product.name,
-                price: parseFloat(product.price),
-                pieces: parseFloat(product.pieces),
-                dose: parseFloat(product.dose),
-                quantity: parseInt(product.quantity),
-            })),
-            location,
-            status: 0,
-            date: new Date(),
-            assignedPharmacy: null,
-            totalPrice: totalPrice
-        };
+            const paymentInfo = {
+                _id: newPayementId,
+                userId,
+                orderId: newOrderId,
+                totalPrice: totalPrice,
+                type: 1,
+                date: dateInIST,
+                PartnerId: null,
+                status: 0,
+                amountToBePaid: amountToBePaid
+            };
 
+            await ordersCollection.insertOne(order, { session });
+            await availableOrderCollection.insertOne(order, { session });
+            await paymentCollection.insertOne(paymentInfo, { session });
+            
+        });
 
-        // Insert the order
-        const paymentInfo = {
-            _id: newPayementId,
-            userId,
-            orderId: newOrderId,
-            totalPrice: totalPrice,
-            type: 1,
-            date: new Date(),
-            PartnerId: null,
-            status: 0,
-            amountToBePaid: amountToBePaid
-        };
+        responses.set(newOrderId, { responses: [], createdAt: Date.now() });
 
-        const result = await ordersCollection.insertOne(order);
-        const result2 = await paymentCollection.insertOne(paymentInfo);
+        evaluateResponses(newOrderId);
 
-
-        if (result.acknowledged && result2.acknowledged) {
-
-            evaluateResponses(newOrderId);
-            // const pharmacies = await pharmacyCollection.find().toArray();
-
-            global.io.emit('newOrder', { orderId: newOrderId });
-            // Send success response to client
-            return res.status(200).json({ status: 'success', message: 'Order placed successfully', orderId: newOrderId });
-        } else {
-            throw new Error('Failed to place order');
-        }
+        global.io.emit('newOrder', { orderId: newOrderId });
+        return res.status(200).json({ status: 'success', message: 'Order placed successfully', orderId: newOrderId });
 
     } catch (error) {
         res.status(500).json({ status: 'error', message: 'An error occurred during order placement', reason: error.message });
     }
 }
-
-async function evaluateResponses(orderId) {
-    setTimeout(async () => {
-
-        if (responses.has(orderId)) {
-            const orderResponses = responses.get(orderId);
-            let bestPharmacy = null;
-            let maxAvailableProducts = -1;
-
-            orderResponses.forEach(response => {
-                const availableProducts = response.products.filter(product => product.available).length;
-                if (availableProducts > maxAvailableProducts) {
-                    maxAvailableProducts = availableProducts;
-                    bestPharmacy = response.pharmacyId;
-                }
-                console.log(availableProducts, maxAvailableProducts, response.pharmacyId);
-            });
-
-            if (bestPharmacy) {
-                await assignOrderToPharmacy(orderId, bestPharmacy);
-            } else {
-                // Handle case where no suitable pharmacy is found
-                console.log(`No suitable pharmacy found for order ${orderId}`);
-                global.io.emit('noSuitablePharmacy', { orderId });
-            }
-
-            responses.delete(orderId);
-        } else {
-            // Handle case where no responses were received
-            console.log(`No responses received for order ${orderId}`);
-            global.io.emit('noResponses', { orderId });
-        }
-    }, 30000);
-}
-
-async function assignOrderToPharmacy(orderId, pharmacyId) {
-    try {
-        await client.connect();
-        const db = client.db("ImmunePlus");
-        const ordersCollection = db.collection("Orders");
-        const paymentCollection = db.collection("payments");
-
-
-        await ordersCollection.updateOne({ _id: orderId }, { $set: { assignedPharmacy: pharmacyId, status: 1 } });
-        await paymentCollection.updateOne({orderId: orderId }, { $set: { PartnerId: pharmacyId, status: 1 } });
-
-        global.io.emit('orderAssigned', { orderId, pharmacyId });
-        console.log(`Order ${orderId} assigned to pharmacy ${pharmacyId}`);
-
-        // Send order confirmation notification
-        await sendOrderConfirmationNotification(orderId, pharmacyId);
-    } catch (error) {
-        console.error("Error assigning order to pharmacy:", error);
-    }
-}
-
 
 async function receivePharmacyResponse(req, res) {
     const { orderId, pharmacyId, products } = req.body;
@@ -182,10 +124,20 @@ async function receivePharmacyResponse(req, res) {
     }
 
     try {
-        if (!responses.has(orderId)) {
-            responses.set(orderId, []);
+        const orderData = responses.get(orderId);
+
+        if (!orderData) {
+            return res.status(400).json({ status: 'error', message: 'Invalid order ID or order has expired' });
         }
-        responses.get(orderId).push({ pharmacyId, products });
+
+        const timeElapsed = Date.now() - orderData.createdAt;
+
+        if (timeElapsed > 60000) {
+            return res.status(400).json({ status: 'error', message: 'Response time exceeded' });
+        }
+
+        orderData.responses.push({ pharmacyId, products });
+        responses.set(orderId, orderData);
 
         const canFulfillEntireOrder = products.every(product => product.available);
 
@@ -197,6 +149,59 @@ async function receivePharmacyResponse(req, res) {
         res.status(200).json({ status: 'success', message: 'Response recorded' });
     } catch (error) {
         res.status(500).json({ status: 'error', message: 'Failed to record response', reason: error.message });
+    }
+}
+
+async function evaluateResponses(orderId) {
+    setTimeout(async () => {
+        const orderData = responses.get(orderId);
+
+        if (!orderData) {
+            console.log(`Order ${orderId} not found or already processed.`);
+            return;
+        }
+
+        const orderResponses = orderData.responses;
+        let bestPharmacy = null;
+        let maxAvailableProducts = -1;
+
+        orderResponses.forEach(response => {
+            const availableProducts = response.products.filter(product => product.available).length;
+            if (availableProducts > maxAvailableProducts) {
+                maxAvailableProducts = availableProducts;
+                bestPharmacy = response.pharmacyId;
+            }
+        });
+
+        if (bestPharmacy) {
+            await assignOrderToPharmacy(orderId, bestPharmacy);
+        } else {
+            console.log(`No suitable pharmacy found for order ${orderId}`);
+            global.io.emit('noSuitablePharmacy', { orderId });
+        }
+
+        responses.delete(orderId);
+    }, 60000);
+}
+
+async function assignOrderToPharmacy(orderId, pharmacyId) {
+    try {
+        await client.connect();
+        const db = client.db("ImmunePlus");
+        const ordersCollection = db.collection("Orders");
+        const paymentCollection = db.collection("payments");
+        const availableOrderCollection = db.collection("ongoingOrders");
+
+        await ordersCollection.updateOne({ _id: orderId }, { $set: { assignedPharmacy: pharmacyId, status: 1 } });
+        await paymentCollection.updateOne({ orderId: orderId }, { $set: { PartnerId: pharmacyId, status: 1 } });
+        await availableOrderCollection.deleteOne({ _id: orderId });
+
+        global.io.emit('orderAssigned', { orderId, pharmacyId });
+        console.log(`Order ${orderId} assigned to pharmacy ${pharmacyId}`);
+
+        await sendOrderConfirmationNotification(orderId, pharmacyId);
+    } catch (error) {
+        console.error("Error assigning order to pharmacy:", error);
     }
 }
 
@@ -306,6 +311,18 @@ async function getAll(req, res) {
         res.status(500).json({ message: 'Failed to fetch Orders', error: error.message });
     }
 }
+async function getAvailableOrders(req, res) {
+    try {
+        const db = client.db("ImmunePlus");
+        const collection = db.collection("ongoingOrders");
+
+        const orders = await collection.find().toArray();
+        res.json(orders);
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to fetch Orders', error: error.message });
+    }
+}
+
 
 
 
@@ -315,5 +332,6 @@ module.exports = {
     getOrderbyId,
     receivePharmacyResponse,
     changeOrderStatus,
-    getAll
+    getAll,
+    getAvailableOrders
 };
