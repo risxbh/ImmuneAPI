@@ -1,5 +1,5 @@
 const express = require('express');
-const { loginUser, registerUser, updateUser, deleteUser,getAll, upload,Dashboard,getOngoingOrder, getOrderbyId } = require('../controllers/pharmaController');
+const { loginUser, registerUser, updateUser, deleteUser,getAll, upload,Dashboard,getOngoingOrder, getOrderbyId,getPharmabyId } = require('../controllers/pharmaController');
 
 const router = express.Router();
 
@@ -11,5 +11,6 @@ router.get('/records', getAll);
 router.get('/dashboard', Dashboard);
 router.get('/ongoingOrder', getOngoingOrder);
 router.get('/getOrderById', getOrderbyId);
+router.get('/getPharmaById', getPharmabyId);
 
 module.exports = router;

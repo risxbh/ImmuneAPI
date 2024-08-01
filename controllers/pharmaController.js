@@ -369,7 +369,7 @@ async function getOrderbyId(req, res) {
     const { id } = req.query;
 
     if (!id) {
-        res.status(400).json({ status: 'error', message: 'Docter ID is required' });
+        res.status(400).json({ status: 'error', message: 'Order ID is required' });
         return;
     }
     try {
@@ -403,6 +403,28 @@ async function getOrderbyId(req, res) {
     }
 }
 
+async function getPharmabyId(req, res) {
+    const { id } = req.query;
+
+    if (!id) {
+        res.status(400).json({ status: 'error', message: 'Pharmacy ID is required' });
+        return;
+    }
+    try {
+        await connectToDatabase();
+        const db = client.db("ImmunePlus");
+        const collection = db.collection("Pharmacy");
+        const pharmacy = await collection.find({ _id: parseInt(id) }).toArray();
+        if (pharmacy.length === 0) {
+            res.status(404).json({ status: 'error', message: 'Pharmacy not found' });
+        } else {
+            res.json(pharmacy);
+        }
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to fetch Pharmacy', error: error.message });
+    }
+}
+
 module.exports = {
     loginUser,
     registerUser,
@@ -412,5 +434,6 @@ module.exports = {
     Dashboard,
     upload,
     getOngoingOrder,
-    getOrderbyId
+    getOrderbyId,
+    getPharmabyId
 };
