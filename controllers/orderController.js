@@ -181,6 +181,7 @@ async function evaluateResponses(orderId) {
         }
 
         responses.delete(orderId);
+        deleteOrder(orderId)
     }, 60000);
 }
 
@@ -320,6 +321,24 @@ async function getAvailableOrders(req, res) {
         res.json(orders);
     } catch (error) {
         res.status(500).json({ message: 'Failed to fetch Orders', error: error.message });
+    }
+}
+
+async function deleteOrder(id) {
+    try {
+        await client.connect();
+        const db = client.db("ImmunePlus");
+        const collection = db.collection("ongoingOrders");
+
+        const result = await collection.deleteOne({ _id: id });
+
+        if (result.deletedCount > 0) {
+           console.log(`order deleted ${id}`);
+        }
+    } catch (error) {
+                   console.log('An error occurred during deletion');
+    } finally {
+        //await client.close();
     }
 }
 
