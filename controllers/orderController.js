@@ -11,6 +11,8 @@ const client = new MongoClient(url, {
         deprecationErrors: true,
     }
 });
+const {sendPharmaNotification} = require('./Notification/pharmaNotification');
+const {sendUserNotification} = require('./Notification/userNotification');
 const Order = require('../models/Order');
 const Pharmacy = require('../models/Pharmacy');
 const responses = new Map();
@@ -33,6 +35,7 @@ async function placeOrder(req, res) {
         const countersCollection = db.collection("Counters");
         const paymentCollection = db.collection("paymentOrder");
         const availableOrderCollection = db.collection("ongoingOrders");
+        const pharmaNotificationCollection = db.collection("pharmaNotification");
 
         let validations = [];
         products.forEach((product, index) => {
@@ -109,6 +112,7 @@ async function placeOrder(req, res) {
         evaluateResponses(newOrderId);
 
         global.io.emit('newOrder', { orderId: newOrderId });
+        sendPharmaNotification(0,newOrderId, 1)
         return res.status(200).json({ status: 'success', message: 'Order placed successfully', orderId: newOrderId });
 
     } catch (error) {
@@ -194,38 +198,22 @@ async function assignOrderToPharmacy(orderId, pharmacyId) {
         const availableOrderCollection = db.collection("ongoingOrders");
 
         await ordersCollection.updateOne({ _id: orderId }, { $set: { assignedPharmacy: pharmacyId, status: 1 } });
-        await paymentCollection.updateOne({ orderId: orderId }, { $set: { PartnerId: pharmacyId, status: 1 } });
+        await paymentCollection.updateOne({ orderId: orderId }, { $set: { PartnerId: pharmacyId } });
         await availableOrderCollection.deleteOne({ _id: orderId });
 
-        global.io.emit('orderAssigned', { orderId, pharmacyId });
-        console.log(`Order ${orderId} assigned to pharmacy ${pharmacyId}`);
+        const order = await ordersCollection.findOne({ _id: parseInt(orderId) });
+        if (!order) {
+            throw new Error(`Order with ID ${orderId} not found`);
+        }
+        let userId = order.userId;
 
-        await sendOrderConfirmationNotification(orderId, pharmacyId);
+        //let message =`Order ${orderId} assigned to your Pharmacy. Please pack the order accordingly. Our rider is on the way.`
+        sendPharmaNotification(pharmacyId,orderId,2)
+        sendUserNotification(userId,orderId,2)
+
+        global.io.emit('orderAssigned', { orderId, pharmacyId,userId });
     } catch (error) {
         console.error("Error assigning order to pharmacy:", error);
-    }
-}
-
-async function sendOrderConfirmationNotification(orderId, pharmacyId) {
-    try {
-        // Connect to the database to get pharmacy details if needed
-        await client.connect();
-        const db = client.db("ImmunePlus");
-        const pharmacyCollection = db.collection("Pharmacy");
-
-        // Fetch the pharmacy details
-        const pharmacy = await pharmacyCollection.findOne({ _id: pharmacyId });
-
-        if (!pharmacy) {
-            console.error(`Pharmacy with ID ${pharmacyId} not found`);
-            return;
-        }
-
-        // Emit the notification
-        global.io.emit('orderConfirmed', { orderId, pharmacyId, pharmacyName: pharmacy.name });
-        console.log(`Notification sent: Order ${orderId} confirmed for pharmacy ${pharmacy.name}`);
-    } catch (error) {
-        console.error("Error sending order confirmation notification:", error);
     }
 }
 
@@ -240,6 +228,7 @@ async function getOrderbyId(req, res) {
         const db = client.db("ImmunePlus");
         const collection = db.collection("Orders");
         const order = await collection.findOne({ _id: parseInt(id) });
+        console.log(id);
         res.json(order);
     } catch (error) {
         res.status(500).json({ message: 'Failed to fetch order', error: error.message });
@@ -251,6 +240,7 @@ async function changeOrderStatus(req, res) {
         const { orderId, status } = req.body;
         const db = client.db("ImmunePlus");
         const collection = db.collection("Orders");
+        const paymentCollection = db.collection("paymentOrder");
 
         let updateFields = { status };
 
@@ -258,18 +248,17 @@ async function changeOrderStatus(req, res) {
             { _id: parseInt(orderId) },
             { $set: updateFields }
         );
+        const order = await collection.findOne({ _id: parseInt(orderId) });
 
+        if(status == 7){
+            await paymentCollection.updateOne({ orderId: orderId }, { $set: { PartnerId: order.assignedPharmacy, status: 7 } });
+        }
         if (result.modifiedCount === 1) {
-            // Fetch the updated order details
-            const updatedOrder = await collection.findOne({ _id: parseInt(orderId) });
 
-            // Emit the status change event to notify about the change
-            global.io.emit('orderStatusChanged', { orderId, status, updatedOrder });
+            global.io.emit('orderStatusChanged', { orderId, status });
 
-            console.log(`Order ${orderId} status changed to ${status}`);
-
-            // Send a confirmation notification to the user
-            await sendOrderStatusNotificationToUser(orderId, updatedOrder.userId, status);
+           sendPharmaNotification(order.assignedPharmacy, order._id, status)
+           sendUserNotification(order.userId, order._id, status)
 
             // Send success response
             res.status(200).json({ status: 'success', message: 'Status Updated' });
@@ -281,26 +270,6 @@ async function changeOrderStatus(req, res) {
     }
 }
 
-async function sendOrderStatusNotificationToUser(orderId, userId, newStatus) {
-    try {
-        const db = client.db("ImmunePlus");
-        const usersCollection = db.collection("Users");
-
-        // Fetch the user details
-        const user = await usersCollection.findOne({ _id: userId });
-
-        if (!user) {
-            console.error(`User with ID ${userId} not found`);
-            return;
-        }
-
-        // Emit the notification
-        global.io.emit('orderStatusNotification', { orderId, userId, newStatus, userName: user.name });
-        console.log(`Notification sent: Order ${orderId} status changed to ${newStatus} for user ${user.fullName}`);
-    } catch (error) {
-        console.error("Error sending order status notification:", error);
-    }
-}
 async function getAll(req, res) {
     try {
         const db = client.db("ImmunePlus");
