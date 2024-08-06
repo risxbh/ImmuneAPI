@@ -210,6 +210,7 @@ async function assignOrderToPharmacy(orderId, pharmacyId) {
         //let message =`Order ${orderId} assigned to your Pharmacy. Please pack the order accordingly. Our rider is on the way.`
         sendPharmaNotification(pharmacyId,orderId,2)
         sendUserNotification(userId,orderId,2)
+        global.io.emit('orderStatusChanged', { orderId, status: 2 });   
 
         global.io.emit('GetDeliveryPartner', { orderId });
     } catch (error) {
@@ -228,7 +229,6 @@ async function getOrderbyId(req, res) {
         const db = client.db("ImmunePlus");
         const collection = db.collection("Orders");
         const order = await collection.findOne({ _id: parseInt(id) });
-        console.log(id);
         res.json(order);
     } catch (error) {
         res.status(500).json({ message: 'Failed to fetch order', error: error.message });
@@ -255,9 +255,7 @@ async function changeOrderStatus(req, res) {
         }
         if (result.modifiedCount === 1) {
 
-            global.io.emit('orderStatusChanged', { orderId, status });
-            console.log(result.modifiedCount);
-            
+            global.io.emit('orderStatusChanged', { orderId, status });            
            sendPharmaNotification(order.assignedPharmacy, order._id, status)
            sendUserNotification(order.userId, order._id, status)
 
