@@ -152,6 +152,69 @@ async function getNotificationbyId(req, res) {
         res.status(500).json({ message: 'Failed to fetch notification', error: error.message });
     }
 }
+const cron = require('node-cron');
+const nodemailer = require('nodemailer');
+const transporter = nodemailer.createTransport({
+    service: 'gmail', // Use your email service
+    auth: {
+        user: 'devanshd78@gmail.com', // Your email
+        pass: '1@Devansh' // Your email password
+    }
+});
+
+function sendNotificationEmail(booking) {
+    const mailOptions = {
+        from: 'devanshd78@gmail.com', // Sender address
+        to: 'rsrisabhsingh212@gmail.com', // List of recipients
+        subject: 'Booking Reminder',
+        text: `You have a booking scheduled with Doctor ID ${booking.doctorId} on ${booking.date} at ${booking.time}.`
+    };
+
+    transporter.sendMail(mailOptions, (error, info) => {
+        if (error) {
+            return console.log(error);
+        }
+        console.log('Email sent: ' + info.response);
+    });
+}
+
+cron.schedule('* * * * *', async () => {
+    try {
+        await client.connect();
+        const db = client.db("ImmunePlus");
+        const bookingsCollection = db.collection("appointments");
+
+        const now = new Date();
+        const oneMinuteFromNow = new Date(now.getTime() + 60000);
+
+        // Fetch bookings that are one minute away and have only one slot left
+        const bookings = await bookingsCollection.find({
+            date: {
+                $gte: new Date(now.toISOString().split('T')[0]), // today
+                $lte: new Date(now.toISOString().split('T')[0] + 'T23:59:59.999Z') // end of today
+            },
+            time: {
+                $gte: now.toISOString().split('T')[1], // current time
+                $lte: oneMinuteFromNow.toISOString().split('T')[1] // one minute from now
+            }
+        }).toArray();
+
+        bookings.forEach(booking => {
+            // Check if there is only one slot left
+            // Assuming you have a way to determine the total slots and booked slots
+            const totalSlots = 10; // Example total slots
+            const bookedSlots = 9; // Example booked slots, this should come from your database
+
+            if (totalSlots - bookedSlots === 1) {
+                sendNotificationEmail(booking);
+            }
+        });
+    } catch (error) {
+        console.error('Error checking bookings:', error);
+    } finally {
+        await client.close();
+    }
+});
 
 async function sendUserNotification(userId,orderId, type) {
     console.log(userId,orderId, type);
@@ -168,6 +231,14 @@ async function sendUserNotification(userId,orderId, type) {
             { upsert: true, returnDocument: 'after' }
         );
         const newNotificationId = counter.seq;
+        let booking, bookingDate
+        if(type == 10 || type == 11){
+            const bookingCollection = db.collection("appointments")
+             booking = bookingCollection.findOne({_id: orderId}).toArray();
+             const date = new Date(dateString);
+             const options = { day: 'numeric', month: 'long' };
+          bookingDate =  date.toLocaleDateString('en-GB', options);
+        }
 
         let message;
         if (type == 1) {
@@ -182,6 +253,12 @@ async function sendUserNotification(userId,orderId, type) {
             message = `Rider reached destination for order ${orderId}`;
         } else if (type == 6) {
             message = `Your Order ${orderId} has been delivered`;
+        }else  if (type == 10) {
+            message = `New Booking ${orderId} has been recorded for ${bookingDate} ${booking.time}.`;
+        } else if (type == 11) {
+            message = `Reminder for Booking ${orderId} on ${bookingDate} ${booking.time}`;
+        } else if (type == 12) {
+            message = `Appointment Completed ${orderId}.`;
         }
 
         const dateInIST = new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" });

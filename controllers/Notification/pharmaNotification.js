@@ -24,6 +24,12 @@ const client = new MongoClient(url, {
 // 8= payment processing
 //9 = payment done
 
+//10 booking Done
+//11 booking Reminder
+//12 Appointment done
+//13 payment processing
+//4 payment done
+
 async function create(req, res) {
    
     try {

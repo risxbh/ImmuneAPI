@@ -35,7 +35,6 @@ async function placeOrder(req, res) {
         const countersCollection = db.collection("Counters");
         const paymentCollection = db.collection("paymentOrder");
         const availableOrderCollection = db.collection("ongoingOrders");
-        const pharmaNotificationCollection = db.collection("pharmaNotification");
 
         let validations = [];
         products.forEach((product, index) => {
@@ -86,7 +85,8 @@ async function placeOrder(req, res) {
                 status: 0,
                 date: dateInIST,
                 assignedPharmacy: null,
-                totalPrice: totalPrice
+                totalPrice: totalPrice,
+                assignedPartner: null
             };
 
             const paymentInfo = {
@@ -199,7 +199,7 @@ async function assignOrderToPharmacy(orderId, pharmacyId) {
 
         await ordersCollection.updateOne({ _id: orderId }, { $set: { assignedPharmacy: pharmacyId, status: 1 } });
         await paymentCollection.updateOne({ orderId: orderId }, { $set: { PartnerId: pharmacyId } });
-        await availableOrderCollection.deleteOne({ _id: orderId });
+        //await availableOrderCollection.deleteOne({ _id: orderId });
 
         const order = await ordersCollection.findOne({ _id: parseInt(orderId) });
         if (!order) {
@@ -211,7 +211,7 @@ async function assignOrderToPharmacy(orderId, pharmacyId) {
         sendPharmaNotification(pharmacyId,orderId,2)
         sendUserNotification(userId,orderId,2)
 
-        global.io.emit('orderAssigned', { orderId, pharmacyId,userId });
+        global.io.emit('GetDeliveryPartner', { orderId });
     } catch (error) {
         console.error("Error assigning order to pharmacy:", error);
     }
@@ -256,7 +256,8 @@ async function changeOrderStatus(req, res) {
         if (result.modifiedCount === 1) {
 
             global.io.emit('orderStatusChanged', { orderId, status });
-
+            console.log(result.modifiedCount);
+            
            sendPharmaNotification(order.assignedPharmacy, order._id, status)
            sendUserNotification(order.userId, order._id, status)
 
@@ -286,7 +287,7 @@ async function getAvailableOrders(req, res) {
         const db = client.db("ImmunePlus");
         const collection = db.collection("ongoingOrders");
 
-        const orders = await collection.find().toArray();
+        const orders = await collection.find({ assignedPharmacy: null }).toArray();
         res.json(orders);
     } catch (error) {
         res.status(500).json({ message: 'Failed to fetch Orders', error: error.message });
@@ -302,7 +303,7 @@ async function deleteOrder(id) {
         const result = await collection.deleteOne({ _id: id });
 
         if (result.deletedCount > 0) {
-           console.log(`order deleted ${id}`);
+            res.status(200).json({ message: `order deleted ${id}`, status: "Success" });
         }
     } catch (error) {
                    console.log('An error occurred during deletion');

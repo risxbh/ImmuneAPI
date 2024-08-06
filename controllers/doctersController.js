@@ -6,6 +6,8 @@ const path = require('path');
 const User = require('../models/User');
 const DoctorAvailability = require('../models/Availability');
 const Appointment = require('../models/Appointments');
+const {sendDoctorNotification} = require('./Notification/docterNotification');
+const {sendUserNotification} = require('./Notification/userNotification');
 
 const url = 'mongodb+srv://rsrisabhsingh212:Immuneplus123@immuneplus.v6jufn0.mongodb.net/?retryWrites=true&w=majority&appName=ImmunePlus';
 
@@ -142,6 +144,9 @@ async function bookAppointment(req, res) {
 
         const result = await appointmentsCollection.insertOne(appointment);
         const result2 = await paymentCollection.insertOne(paymentInfo);
+
+        sendDoctorNotification(schedule.doctorId,newId, 10)
+        sendUserNotification(patientId,newId, 10)
 
         if (result.acknowledged === true && result2.acknowledged == true) {
             res.status(200).json({ status: 'success', message: 'Appointment booked successfully', bookingId: newId });

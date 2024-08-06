@@ -146,10 +146,72 @@ async function getNotificationbyId(req, res) {
     }
 }
 
+async function sendDoctorNotification(userId,bookingId, type) {
+    try {
+        await client.connect();
+        const db = client.db("ImmunePlus");
+        const notificationsCollection = db.collection("docterNotification");
+        const countersCollection = db.collection("Counters");
+        const bookingCollection = db.collection("appointments")
+
+        const booking = bookingCollection.findOne({_id: bookingId}).toArray();
+
+        // Generate new notification ID
+        const counter = await countersCollection.findOneAndUpdate(
+            { _id: "docterNotificationId" },
+            { $inc: { seq: 1 } },
+            { upsert: true, returnDocument: 'after' }
+        );
+        const newNotificationId = counter.seq;
+
+        const date = new Date(dateString);
+        const options = { day: 'numeric', month: 'long' };
+        let bookingDate =  date.toLocaleDateString('en-GB', options);
+
+        const dateInIST = new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" });
+        let message;
+        if (type == 10) {
+            message = `New Booking ${bookingId} has been recorded for ${bookingDate} ${booking.time}.`;
+        } else if (type == 11) {
+            message = `Reminder for Booking ${bookingId} on ${bookingDate} ${booking.time}`;
+        } else if (type == 12) {
+            message = `Appointment Done for Appointment ${bookingId}. Payment is generated.`;
+        } else if (type == 13) {
+            message = `Payment ${bookingId} for order is in process`;
+        } else if (type == 14) {
+            message = `Payment ${bookingId} for order is in process`;
+        }
+        const notification = {
+            userId: parseInt(userId),
+            userType: 2,
+            message: message,
+            date: dateInIST,
+            read: false,
+            type: type,
+            status: 'pending',
+            _id: newNotificationId
+        };
+     
+        const result = await notificationsCollection.insertOne(notification);
+
+        if (result.acknowledged) {
+            
+            
+        } else {
+            throw new Error('Failed to insert notification');
+        }
+    } catch (error) {
+        console.error('Error sending notification:', error.message);
+    } finally {
+        await client.close();
+    }
+}
+
 module.exports = {
     create,
     getAllNotification,
     update,
     remove,
-    getNotificationbyId
+    getNotificationbyId,
+    sendDoctorNotification
 };
