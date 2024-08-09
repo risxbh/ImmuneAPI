@@ -40,19 +40,20 @@ async function create(req, res) {
         if (existing) {
             res.status(400).json({ status: 'error', message: 'Category already exists' });
         } else {
-            const filePath = path.join('uploads/category', req.file.originalname);
-            if (!fs.existsSync('uploads/category')) {
-                fs.mkdirSync('uploads/category', { recursive: true });
-            }
-            fs.writeFileSync(filePath, req.file.buffer);
-
-            // Get and increment the counter for TypeOfTreatment
             const counter = await countersCollection.findOneAndUpdate(
                 { _id: "categoryId" },
                 { $inc: { seq: 1 } },
                 { upsert: true, returnDocument: 'after' }
             );
             const newId = counter.seq;
+            const filePath = path.join('uploads/category', `${newId}`);
+            if (!fs.existsSync('uploads/category')) {
+                fs.mkdirSync('uploads/category', { recursive: true });
+            }
+            fs.writeFileSync(filePath, req.file.buffer);
+
+            // Get and increment the counter for TypeOfTreatment
+
          
             const result = await collection.insertOne({
                 _id: newId,
@@ -100,7 +101,7 @@ async function update(req, res) {
         } else {
 
         if (req.file && req.file.buffer) {
-            const filePath = path.join('uploads/category', req.file.originalname);
+            const filePath = path.join('uploads/category',`${id}`);
             if (!fs.existsSync('uploads/category')) {
                 fs.mkdirSync('uploads/category', { recursive: true });
             }

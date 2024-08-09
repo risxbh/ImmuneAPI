@@ -163,7 +163,7 @@ async function bookAppointment(req, res) {
 module.exports = bookAppointment;
 
 async function registerDoctor(req, res) {
-    const { name, hospital, about, type, patients, experience, rating, location, specialist, videoFee, appointmentFee, email, password,workinghours } = req.body;
+    const { name, hospital, about, type, patients, experience, rating, location, specialist, videoFee, appointmentFee, email, password,workinghours, accountNumber, ifscCode, accountHolderName } = req.body;
     let validations = [];
     let regex = /^(?=.*[0-9])(?=.*[!@#$%^&*])(?=.*[A-Z])(?=.*[a-z])/;
     let emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -201,6 +201,11 @@ async function registerDoctor(req, res) {
     if (!appointmentFee) validations.push({ key: 'appointmentFee', message: 'Appointment Fee is required' });
     if (!location) validations.push({ key: 'location', message: 'Location is required' });
     if (!workinghours) validations.push({ key: 'workinghours', message: 'Working Hours is required' });
+    if (!accountNumber) validations.push({ key: 'accountNumber', message: 'Account Number is required' });
+    if (!ifscCode) validations.push({ key: 'ifscCode', message: 'IFSC Code is required' });
+    if (!accountHolderName) validations.push({ key: 'accountHolderName', message: 'Account Holder Name is required' });
+
+
 
     if (validations.length) {
         res.status(400).json({ status: 'error', validations: validations });
@@ -212,27 +217,26 @@ async function registerDoctor(req, res) {
         const db = client.db("ImmunePlus");
         const collection = db.collection("Doctors");
         const countersCollection = db.collection("Counters");
-        const workingHoursCollection = db.collection("WorkingHours");
-        const workingDaysCollection = db.collection("Weekdays");
 
         const existingUser = await collection.findOne({ email });
 
         if (existingUser) {
             res.status(400).json({ status: 'error', message: 'Email already exists' });
         } else {
-            const filePath = path.join('uploads/doctor', req.file.originalname);
-            if (!fs.existsSync('uploads/doctor')) {
-                fs.mkdirSync('uploads/doctor', { recursive: true });
-            }
-            fs.writeFileSync(filePath, req.file.buffer);
-            const hashedPassword = await bcrypt.hash(password, 10);
-
             const counter = await countersCollection.findOneAndUpdate(
                 { _id: "doctorId" },
                 { $inc: { seq: 1 } },
                 { upsert: true, returnDocument: 'after' }
             );
             const newId = counter.seq;
+            const filePath = path.join('uploads/doctor', `${newId}`);
+            if (!fs.existsSync('uploads/doctor')) {
+                fs.mkdirSync('uploads/doctor', { recursive: true });
+            }
+            fs.writeFileSync(filePath, req.file.buffer);
+            const hashedPassword = await bcrypt.hash(password, 10);
+
+
 
             // Parse workinghours and workingDays as arrays of integers
             // const parsedWorkingHours = workinghours.split(',').map(Number);
@@ -248,7 +252,8 @@ async function registerDoctor(req, res) {
             const result = await collection.insertOne({
                 password: hashedPassword,
                 name, hospital, about, type, patients, experience, rating, location, specialist, videoFee, appointmentFee, email,workinghours,
-                _id: newId
+                _id: newId,
+                accountNumber, ifscCode, accountHolderName
             });
 
             if (result.acknowledged === true) {
@@ -416,7 +421,7 @@ async function loginDoctor(req, res) {
 
 async function updateDoctor(req, res) {
     try {
-    const {id, name, hospital, about, type, patients, experience, rating, workinghours, totalslots, availableSlots, location, specialist, workingDays, videoFee, appointmentFee, email, password } = req.body;
+    const {id, name, hospital, about, type, patients, experience, rating, workinghours, totalslots, availableSlots, location, specialist, workingDays, videoFee, appointmentFee, email, password,accountNumber, ifscCode, accountHolderName } = req.body;
     let validations = [];
     let regex = /^(?=.*[0-9])(?=.*[!@#$%^&*])(?=.*[A-Z])(?=.*[a-z])/;
     let emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -464,8 +469,11 @@ async function updateDoctor(req, res) {
         if (workingDays) updatedFields.workingDays = workingDays;
         if (videoFee) updatedFields.videoFee = videoFee;
         if (appointmentFee) updatedFields.appointmentFee = appointmentFee;
+        if (accountNumber) updatedFields.accountNumber = accountNumber;
+        if (ifscCode) updatedFields.ifscCode = ifscCode;
+        if (accountHolderName) updatedFields.accountHolderName = accountHolderName;
         if (req.file && req.file.buffer) {
-            const filePath = path.join('uploads/doctor', req.file.originalname);
+            const filePath = path.join('uploads/doctor', `${id}`);
             if (!fs.existsSync('uploads/doctor')) {
                 fs.mkdirSync('uploads/category', { recursive: true });
             }

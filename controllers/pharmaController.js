@@ -18,7 +18,7 @@ const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
 async function registerUser(req, res) {
-    const { name, password, address, phoneNumber, licenseNo, email } = req.body;
+    const { name, password, address, phoneNumber, licenseNo, email, accountHolderName, accountNumber, ifscCode } = req.body;
     let validations = [];
     let regex = /^(?=.*[0-9])(?=.*[!@#$%^&*])(?=.*[A-Z])(?=.*[a-z])/;
     let emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -60,6 +60,10 @@ async function registerUser(req, res) {
     else if (!emailRegex.test(email)) validations.push({ key: 'email', message: 'Email is not valid' });
     if (!licenseNo) validations.push({ key: 'licenseNo', message: 'License No is required' });
     if (!req.file || !req.file.buffer) validations.push({ key: 'licenseImg', message: 'Image is required' });
+    if (!accountNumber) validations.push({ key: 'accountNumber', message: 'Account Number is required' });
+    if (!ifscCode) validations.push({ key: 'ifscCode', message: 'IFSC Code is required' });
+    if (!accountHolderName) validations.push({ key: 'accountHolderName', message: 'Account Holder Name is required' });
+
 
     if (validations.length) {
         res.status(400).json({ status: 'error', validations: validations });
@@ -77,12 +81,6 @@ async function registerUser(req, res) {
         if (existingUser) {
             res.status(400).json({ status: 'error', message: 'Phone Number already exists' });
         } else {
-            const filePath = path.join('uploads/pharmacy', req.file.originalname);
-            if (!fs.existsSync('uploads/pharmacy')) {
-                fs.mkdirSync('uploads/pharmacy', { recursive: true });
-            }
-            fs.writeFileSync(filePath, req.file.buffer);
-            const hashedPassword = await bcrypt.hash(password, 10);
 
             const counter = await countersCollection.findOneAndUpdate(
                 { _id: "pharmacyId" },
@@ -90,6 +88,14 @@ async function registerUser(req, res) {
                 { upsert: true, returnDocument: 'after' }
             );
             const newId = counter.seq;
+            const filePath = path.join('uploads/pharmacy', `${newId}`);
+            if (!fs.existsSync('uploads/pharmacy')) {
+                fs.mkdirSync('uploads/pharmacy', { recursive: true });
+            }
+            fs.writeFileSync(filePath, req.file.buffer);
+            const hashedPassword = await bcrypt.hash(password, 10);
+
+
 
             const result = await collection.insertOne({
                 _id: newId,
@@ -171,7 +177,7 @@ async function loginUser(req, res) {
 
 
 async function updateUser(req, res) {
-    const { name, password, address, phoneNumber, licenseNo, email, id } = req.body;
+    const { name, password, address, phoneNumber, licenseNo, email, id, accountHolderName, accountNumber, ifscCode } = req.body;
     let validations = [];
     let regex = /^(?=.*[0-9])(?=.*[!@#$%^&*])(?=.*[A-Z])(?=.*[a-z])/;
     let emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -211,8 +217,11 @@ async function updateUser(req, res) {
         if (email) updatedFields.email = email;
         if (licenseNo) updatedFields.licenseNo = licenseNo;
         if (phoneNumber) updatedFields.phoneNumber = phoneNumber;
+        if (accountNumber) updatedFields.accountNumber = accountNumber;
+        if (ifscCode) updatedFields.ifscCode = ifscCode;
+        if (accountHolderName) updatedFields.accountHolderName = accountHolderName;
         if (req.file && req.file.buffer) {
-            const filePath = path.join('uploads/pharmacy', req.file.originalname);
+            const filePath = path.join('uploads/pharmacy', `${id}`);
             if (!fs.existsSync('uploads/pharmacy')) {
                 fs.mkdirSync('uploads/pharmacy', { recursive: true });
             }

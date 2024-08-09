@@ -41,19 +41,20 @@ async function create(req, res) {
         if (existing) {
             res.status(400).json({ status: 'error', message: 'Type Of Treatment already exists' });
         } else {
-            const filePath = path.join('uploads/treatment', req.file.originalname);
-            if (!fs.existsSync('uploads/treatment')) {
-                fs.mkdirSync('uploads/treatment', { recursive: true });
-            }
-            fs.writeFileSync(filePath, req.file.buffer);
-
-            // Get and increment the counter for TypeOfTreatment
             const counter = await countersCollection.findOneAndUpdate(
                 { _id: "typeOfTreatmentId" },
                 { $inc: { seq: 1 } },
                 { upsert: true, returnDocument: 'after' }
             );
             const newId = counter.seq;
+            const filePath = path.join('uploads/treatment', `${newId}`);
+            if (!fs.existsSync('uploads/treatment')) {
+                fs.mkdirSync('uploads/treatment', { recursive: true });
+            }
+            fs.writeFileSync(filePath, req.file.buffer);
+
+            // Get and increment the counter for TypeOfTreatment
+
          
             const result = await collection.insertOne({
                 _id: newId,
@@ -103,7 +104,7 @@ async function update(req, res) {
             res.status(400).json({ status: 'error', message: 'Type Of Treatment already exists' });
         } else {
         if (req.file && req.file.buffer) {
-            const filePath = path.join('uploads/treatment', req.file.originalname);
+            const filePath = path.join('uploads/treatment', `${id}`);
             if (!fs.existsSync('uploads/treatment')) {
                 fs.mkdirSync('uploads/treatment', { recursive: true });
             }

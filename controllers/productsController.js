@@ -43,7 +43,13 @@ async function create(req, res) {
         if (existing) {
             return res.status(400).json({ status: 'error', message: 'Product already exists' });
         } else {
-            const filePath = path.join('uploads/product', req.file.originalname);
+            const counter = await countersCollection.findOneAndUpdate(
+                { _id: "productId" },
+                { $inc: { seq: 1 } },
+                { upsert: true, returnDocument: 'after' }
+            );
+            const newId = counter.seq;
+            const filePath = path.join('uploads/product', `${newId}`);
             if (!fs.existsSync('uploads/product')) {
                 fs.mkdirSync('uploads/product', { recursive: true });
             }
@@ -90,12 +96,7 @@ async function create(req, res) {
             }
 
             // Get and increment the counter for TypeOfTreatment
-            const counter = await countersCollection.findOneAndUpdate(
-                { _id: "productId" },
-                { $inc: { seq: 1 } },
-                { upsert: true, returnDocument: 'after' }
-            );
-            const newId = counter.seq;
+
 
             const result = await collection.insertOne({
                 _id: newId,
@@ -167,7 +168,7 @@ async function update(req, res) {
         }
 
         if (req.file && req.file.buffer) {
-            const filePath = path.join('uploads/product', req.file.originalname);
+            const filePath = path.join('uploads/product', `${id}`);
             if (!fs.existsSync('uploads/product')) {
                 fs.mkdirSync('uploads/product', { recursive: true });
             }
