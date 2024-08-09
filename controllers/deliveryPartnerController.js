@@ -19,7 +19,7 @@ const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
 async function registerDelivery(req, res) {
-    const { fullname, phoneNumber, address, licenseNo, experience, city, password, accountNumber, ifscCode, accountHolderName } = req.body;
+    const { fullname, phoneNumber, address, licenseNo, experience, city, password, accountNumber, ifscCode, accountHolderName, bankName } = req.body;
     let validations = [];
     let regex = /^(?=.*[0-9])(?=.*[!@#$%^&*])(?=.*[A-Z])(?=.*[a-z])/;
 
@@ -53,6 +53,7 @@ async function registerDelivery(req, res) {
     if (!accountNumber) validations.push({ key: 'accountNumber', message: 'Account Number is required' });
     if (!ifscCode) validations.push({ key: 'ifscCode', message: 'IFSC Code is required' });
     if (!accountHolderName) validations.push({ key: 'accountHolderName', message: 'Account Holder Name is required' });
+    if (!bankName) validations.push({ key: 'bankName', message: 'Bank Name is required' });
     if (phoneNumber) {
         if (phoneNumber.length !== 10) {
             phoneNumMessage = 'Phone Number should have 10 digits.';
@@ -111,7 +112,7 @@ async function registerDelivery(req, res) {
             const result = await collection.insertOne({
                 _id: newId,
                 fullname, phoneNumber, address, licenseNo, licensePhoto: licenseFilePath, rcPhoto: rcFilePath, experience, city, password: hashedPassword, profilePic: profileFilePath,
-                accountNumber, ifscCode, accountHolderName
+                accountNumber, ifscCode, accountHolderName,bankName
             });
 
             if (result.acknowledged) {
@@ -186,7 +187,7 @@ async function loginDelivery(req, res) {
 }
 
 async function updateDelivery(req, res) {
-    const { id, password, address, fullName, licenseNo, experience, city, phoneNumber,accountNumber, ifscCode, accountHolderName  } = req.body;
+    const { id, password, address, fullName, licenseNo, experience, city, phoneNumber,accountNumber, ifscCode, accountHolderName, bankName  } = req.body;
     let validations = [];
     let regex = /^(?=.*[0-9])(?=.*[!@#$%^&*])(?=.*[A-Z])(?=.*[a-z])/;
 
@@ -227,6 +228,7 @@ async function updateDelivery(req, res) {
         if (accountNumber) updatedFields.accountNumber = accountNumber;
         if (ifscCode) updatedFields.ifscCode = ifscCode;
         if (accountHolderName) updatedFields.accountHolderName = accountHolderName;
+        if (bankName) updatedFields.bankName = bankName;
 
         if (req.files) {
             if (req.files.licensePhoto && req.files.licensePhoto[0]) {

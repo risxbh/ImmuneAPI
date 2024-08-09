@@ -163,7 +163,7 @@ async function bookAppointment(req, res) {
 module.exports = bookAppointment;
 
 async function registerDoctor(req, res) {
-    const { name, hospital, about, type, patients, experience, rating, location, specialist, videoFee, appointmentFee, email, password,workinghours, accountNumber, ifscCode, accountHolderName } = req.body;
+    const { name, hospital, about, type, patients, experience, rating, location, specialist, videoFee, appointmentFee, email, password,workinghours, accountNumber, ifscCode, accountHolderName, bankName } = req.body;
     let validations = [];
     let regex = /^(?=.*[0-9])(?=.*[!@#$%^&*])(?=.*[A-Z])(?=.*[a-z])/;
     let emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -204,6 +204,7 @@ async function registerDoctor(req, res) {
     if (!accountNumber) validations.push({ key: 'accountNumber', message: 'Account Number is required' });
     if (!ifscCode) validations.push({ key: 'ifscCode', message: 'IFSC Code is required' });
     if (!accountHolderName) validations.push({ key: 'accountHolderName', message: 'Account Holder Name is required' });
+    if (!bankName) validations.push({ key: 'bankName', message: 'Bank Name is required' });
 
 
 
@@ -253,7 +254,7 @@ async function registerDoctor(req, res) {
                 password: hashedPassword,
                 name, hospital, about, type, patients, experience, rating, location, specialist, videoFee, appointmentFee, email,workinghours,
                 _id: newId,
-                accountNumber, ifscCode, accountHolderName
+                accountNumber, ifscCode, accountHolderName, bankName
             });
 
             if (result.acknowledged === true) {
@@ -421,7 +422,7 @@ async function loginDoctor(req, res) {
 
 async function updateDoctor(req, res) {
     try {
-    const {id, name, hospital, about, type, patients, experience, rating, workinghours, totalslots, availableSlots, location, specialist, workingDays, videoFee, appointmentFee, email, password,accountNumber, ifscCode, accountHolderName } = req.body;
+    const {id, name, hospital, about, type, patients, experience, rating, workinghours, totalslots, availableSlots, location, specialist, workingDays, videoFee, appointmentFee, email, password,accountNumber, ifscCode, accountHolderName,bankName } = req.body;
     let validations = [];
     let regex = /^(?=.*[0-9])(?=.*[!@#$%^&*])(?=.*[A-Z])(?=.*[a-z])/;
     let emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -472,6 +473,7 @@ async function updateDoctor(req, res) {
         if (accountNumber) updatedFields.accountNumber = accountNumber;
         if (ifscCode) updatedFields.ifscCode = ifscCode;
         if (accountHolderName) updatedFields.accountHolderName = accountHolderName;
+        if (bankName) updatedFields.bankName = bankName;
         if (req.file && req.file.buffer) {
             const filePath = path.join('uploads/doctor', `${id}`);
             if (!fs.existsSync('uploads/doctor')) {

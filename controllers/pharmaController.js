@@ -18,7 +18,7 @@ const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
 async function registerUser(req, res) {
-    const { name, password, address, phoneNumber, licenseNo, email, accountHolderName, accountNumber, ifscCode } = req.body;
+    const { name, password, address, phoneNumber, licenseNo, email, accountHolderName, accountNumber, ifscCode,bankName } = req.body;
     let validations = [];
     let regex = /^(?=.*[0-9])(?=.*[!@#$%^&*])(?=.*[A-Z])(?=.*[a-z])/;
     let emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -63,6 +63,7 @@ async function registerUser(req, res) {
     if (!accountNumber) validations.push({ key: 'accountNumber', message: 'Account Number is required' });
     if (!ifscCode) validations.push({ key: 'ifscCode', message: 'IFSC Code is required' });
     if (!accountHolderName) validations.push({ key: 'accountHolderName', message: 'Account Holder Name is required' });
+    if (!bankName) validations.push({ key: 'bankName', message: 'Bank Name is required' });
 
 
     if (validations.length) {
@@ -104,7 +105,11 @@ async function registerUser(req, res) {
                 name,
                 phoneNumber,
                 licenseNo,
-                licenseImg: filePath
+                bankName,
+                licenseImg: filePath,
+                accountHolderName,
+                accountNumber,
+                ifscCode
             });
            
             if (result.acknowledged === true) {
@@ -177,7 +182,7 @@ async function loginUser(req, res) {
 
 
 async function updateUser(req, res) {
-    const { name, password, address, phoneNumber, licenseNo, email, id, accountHolderName, accountNumber, ifscCode } = req.body;
+    const { name, password, address, phoneNumber, licenseNo, email, id, accountHolderName, accountNumber, ifscCode, bankName } = req.body;
     let validations = [];
     let regex = /^(?=.*[0-9])(?=.*[!@#$%^&*])(?=.*[A-Z])(?=.*[a-z])/;
     let emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -220,6 +225,7 @@ async function updateUser(req, res) {
         if (accountNumber) updatedFields.accountNumber = accountNumber;
         if (ifscCode) updatedFields.ifscCode = ifscCode;
         if (accountHolderName) updatedFields.accountHolderName = accountHolderName;
+        if (bankName) updatedFields.bankName = bankName;
         if (req.file && req.file.buffer) {
             const filePath = path.join('uploads/pharmacy', `${id}`);
             if (!fs.existsSync('uploads/pharmacy')) {
