@@ -318,7 +318,7 @@ async function Dashboard(req, res) {
 
             acc.totalOrders += 1;
 
-            if (order.status > 0 && order.status <= 4) {
+            if (order.status > 0 && order.status <= 7) {
                 acc.runingOrder += 1;
             }
             if (orderDate === today) {

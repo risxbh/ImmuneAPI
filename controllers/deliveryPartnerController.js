@@ -430,9 +430,81 @@ async function getUserbyId(req, res) {
     }
 }
 
+let isConnected = false;
+async function connectToDatabase() {
+    if (!isConnected) {
+        try {
+            await client.connect();
+            isConnected = true;
+        } catch (err) {
+            throw err;
+        }
+    }
+}
+async function Dashboard(req, res) {
+    const { id } = req.query;
 
+    if (!id) {
+        res.status(400).json({ status: 'error', message: 'User ID is required' });
+        return;
+    }
 
+    try {
+        await connectToDatabase();
+        const db = client.db("ImmunePlus");
+        const ordersCollection = db.collection("Orders");
+        const paymentsCollection = db.collection("paymentDelivery");
 
+        const today = new Date().toISOString().split('T')[0];
+
+        // Fetch all orders assigned to the partner
+        const ordersData = await ordersCollection.find({ assignedPartner: parseInt(id) }).toArray();
+
+        // Calculate stats from orders
+        const stats = ordersData.reduce((acc, order) => {
+            const orderDate = new Date(order.date).toISOString().split('T')[0]; // Extract date in YYYY-MM-DD forma
+
+            if (orderDate === today) {
+                acc.todayOrder += 1;
+                acc.money += 50;
+                if (order.status > 3 && order.status < 7) {
+                    acc.runningOrder += 1;
+                }else if(order.status >= 7){
+                    acc.totalOrderDelivered +=1
+                }
+                
+            }
+
+            return acc;
+        }, {
+            totalOrderDelivered: 0,
+            todayOrder: 0,
+            runningOrder: 0,
+            money: 0
+        });
+
+        // Calculate total payments due
+        const paymentsDue = await paymentsCollection.aggregate([
+            { $match: { userId: parseInt(id), status: { $in: [0, 1] } } },
+            { $group: { _id: null, totalDue: { $sum: "$amount" } } }
+        ]).toArray();
+
+        const totalPaymentsDue = paymentsDue.length > 0 ? paymentsDue[0].totalDue : 0;
+
+        // Include total payments due in the response
+        res.json({
+            totalOrderDelivered: stats.totalOrderDelivered,
+            todayOrder: stats.todayOrder,
+            runningOrder: stats.runningOrder,
+            moneyMadeToday: stats.money,
+            totalPaymentsDue: totalPaymentsDue
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to fetch data', error: error.message });
+    } finally {
+        await client.close();
+    }
+}
 
 module.exports = {
     registerDelivery,
@@ -443,5 +515,6 @@ module.exports = {
     getAll,
     getAvailableOrders,
     getUserbyId,
+    Dashboard,
     upload
 };

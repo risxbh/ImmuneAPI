@@ -1,5 +1,5 @@
 const express = require('express');
-const { loginDelivery, registerDelivery, upload, updateDelivery, deleteDelivery, getAll,assignOrderToPartner,getAvailableOrders, getUserbyId } = require('../controllers/deliveryPartnerController');
+const { loginDelivery, registerDelivery, upload, updateDelivery, deleteDelivery, getAll,assignOrderToPartner,getAvailableOrders, getUserbyId, Dashboard } = require('../controllers/deliveryPartnerController');
 
 const router = express.Router();
 
@@ -10,6 +10,7 @@ router.post('/delete', deleteDelivery);
 router.get('/records', getAll);
 router.get('/getAvailable', getAvailableOrders);
 router.get('/getById', getUserbyId);
+router.get('/dashboard', Dashboard);
 router.post('/request', assignOrderToPartner);
 // router.get('/getById', getUserbyId);
 
