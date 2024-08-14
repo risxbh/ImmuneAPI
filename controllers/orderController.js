@@ -210,7 +210,7 @@ async function assignOrderToPharmacy(orderId, pharmacyId) {
         //let message =`Order ${orderId} assigned to your Pharmacy. Please pack the order accordingly. Our rider is on the way.`
         sendPharmaNotification(pharmacyId,orderId,2)
         sendUserNotification(userId,orderId,2)
-        global.io.emit('orderStatusChanged', { orderId, status: 2 });   
+        global.io.emit('orderStatusChanged', { orderId, status: 2, userId, pharmacyId });   
 
         global.io.emit('GetDeliveryPartner', { orderId });
     } catch (error) {
@@ -254,8 +254,9 @@ async function changeOrderStatus(req, res) {
             await paymentCollection.updateOne({ orderId: orderId }, { $set: { PartnerId: order.assignedPharmacy, status: 7 } });
         }
         if (result.modifiedCount === 1) {
-
-            global.io.emit('orderStatusChanged', { orderId, status });            
+            let userId= order.userId
+            let pharmacyId = order.pharmacyId
+            global.io.emit('orderStatusChanged', { orderId, status, userId, pharmacyId  });            
            sendPharmaNotification(order.assignedPharmacy, order._id, status)
            sendUserNotification(order.userId, order._id, status)
 

@@ -24,6 +24,7 @@ const paymentOrderRoutes = require("./routes/paymentOrderRoutes")
 const userNotification = require("./routes/notificationRoutes/userNotificationRoutes")
 const pharmaNotification = require("./routes/notificationRoutes/pharmaNotificationRoutes")
 const docterNotification = require("./routes/notificationRoutes/docterNotificationRoutes")
+const posterRoutes = require("./routes/posterRoutes")
 
 const app = express();
 const server = http.createServer(app);
@@ -65,6 +66,7 @@ app.use("/paymentOrder", paymentOrderRoutes);
 app.use("/userNotification",userNotification)
 app.use("/pharmaNotification",pharmaNotification)
 app.use("/docterNotification",docterNotification)
+app.use("/poster",posterRoutes)
 
 io.on("connection", (socket) => {
   console.log("New client connected");
