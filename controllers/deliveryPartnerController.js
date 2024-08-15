@@ -430,7 +430,7 @@ async function deleteDelivery(req, res) {
 
 async function getAll(req, res) {
   try {
-    await connectToDatabase();
+    await client.connect();
     const db = client.db("ImmunePlus");
     const collection = db.collection("DeliveryPartner");
 
@@ -445,7 +445,7 @@ async function getAll(req, res) {
 
 async function getAvailableOrders(req, res) {
   try {
-    await connectToDatabase();
+    await client.connect();
     const db = client.db("ImmunePlus");
     const collection = db.collection("ongoingOrders");
 
@@ -470,7 +470,7 @@ async function getUserbyId(req, res) {
     return;
   }
   try {
-    await connectToDatabase();
+    await client.connect();
     const db = client.db("ImmunePlus");
     const collection = db.collection("DeliveryPartner");
     const user = await collection.find({ _id: parseInt(id) }).toArray();
@@ -500,7 +500,7 @@ async function assignOrderToPartner(req, res) {
     return;
   }
   try {
-    await connectToDatabase();
+    await client.connect();
     const db = client.db("ImmunePlus");
     const ordersCollection = db.collection("Orders");
     const paymentCollection = db.collection("paymentDelivery");
@@ -573,7 +573,7 @@ async function getUserbyId(req, res) {
     return;
   }
   try {
-    await connectToDatabase();
+    await client.connect();
     const db = client.db("ImmunePlus");
     const collection = db.collection("DeliveryPartner");
     const user = await collection.find({ _id: parseInt(id) }).toArray();
@@ -609,7 +609,7 @@ async function Dashboard(req, res) {
   }
 
   try {
-    await connectToDatabase();
+    await client.connect();
     const db = client.db("ImmunePlus");
     const ordersCollection = db.collection("Orders");
     const paymentsCollection = db.collection("paymentDelivery");
