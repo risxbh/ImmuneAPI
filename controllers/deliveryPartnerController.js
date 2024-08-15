@@ -191,7 +191,7 @@ async function registerDelivery(req, res) {
       reason: error.message,
     });
   } finally {
-    await client.close();
+    //await client.close();
   }
 }
 
@@ -262,7 +262,7 @@ async function loginDelivery(req, res) {
       reason: error.message,
     });
   } finally {
-    await client.close();
+    //await client.close();
   }
 }
 
@@ -376,7 +376,7 @@ async function updateDelivery(req, res) {
       reason: error.message,
     });
   } finally {
-    await client.close();
+    //await client.close();
   }
 }
 
@@ -424,7 +424,7 @@ async function deleteDelivery(req, res) {
       reason: error,
     });
   } finally {
-    await client.close();
+    //await client.close();
   }
 }
 
@@ -670,7 +670,7 @@ async function Dashboard(req, res) {
       .status(500)
       .json({ message: "Failed to fetch data", error: error.message });
   } finally {
-    await client.close();
+    //await client.close();
   }
 }
 
