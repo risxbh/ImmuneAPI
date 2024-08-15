@@ -4,7 +4,7 @@ const bodyParser = require("body-parser");
 const mongoose = require("mongoose");
 const http = require("http");
 const socketIo = require("socket.io");
-const cron = require('node-cron');
+const cron = require("node-cron");
 
 const userRoutes = require("./routes/userRoutes");
 const ageGroupRoutes = require("./routes/ageGroup");
@@ -18,13 +18,13 @@ const pharmaRoutes = require("./routes/pharmaRoutes");
 const orderRoutes = require("./routes/orderRoutes");
 const userReviewPosterRoutes = require("./routes/userReviewPosterRoutes");
 const docterSpecRoutes = require("./routes/docterSpecRoutes");
-const deliveryRoutes = require("./routes/deliveryPartner")
-const paymentBookingRoutes = require("./routes/paymentBookingRoutes")
-const paymentOrderRoutes = require("./routes/paymentOrderRoutes")
-const userNotification = require("./routes/notificationRoutes/userNotificationRoutes")
-const pharmaNotification = require("./routes/notificationRoutes/pharmaNotificationRoutes")
-const docterNotification = require("./routes/notificationRoutes/docterNotificationRoutes")
-const posterRoutes = require("./routes/posterRoutes")
+const deliveryRoutes = require("./routes/deliveryPartner");
+const paymentBookingRoutes = require("./routes/paymentBookingRoutes");
+const paymentOrderRoutes = require("./routes/paymentOrderRoutes");
+const userNotification = require("./routes/notificationRoutes/userNotificationRoutes");
+const pharmaNotification = require("./routes/notificationRoutes/pharmaNotificationRoutes");
+const docterNotification = require("./routes/notificationRoutes/docterNotificationRoutes");
+const posterRoutes = require("./routes/posterRoutes");
 
 const app = express();
 const server = http.createServer(app);
@@ -63,10 +63,10 @@ app.use("/docterSpec", docterSpecRoutes);
 app.use("/delivery", deliveryRoutes);
 app.use("/paymentBooking", paymentBookingRoutes);
 app.use("/paymentOrder", paymentOrderRoutes);
-app.use("/userNotification",userNotification)
-app.use("/pharmaNotification",pharmaNotification)
-app.use("/docterNotification",docterNotification)
-app.use("/poster",posterRoutes)
+app.use("/userNotification", userNotification);
+app.use("/pharmaNotification", pharmaNotification);
+app.use("/docterNotification", docterNotification);
+app.use("/poster", posterRoutes);
 
 io.on("connection", (socket) => {
   console.log("New client connected");
@@ -79,7 +79,7 @@ global.io = io;
 
 mongoose
   .connect(
-    "mongodb+srv://rsrisabhsingh212:Immuneplus123@immuneplus.v6jufn0.mongodb.net/ImmunePlus?retryWrites=true&w=majority",
+    "mongodb+srv://rsrisabhsingh212:Immuneplus123@immuneplus.v6jufn0.mongodb.net/ImmunePlus?retryWrites=true&w=majority"
   )
   .then(() => {
     console.log("Connected to MongoDB");
