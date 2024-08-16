@@ -108,7 +108,7 @@ async function create(req, res) {
                 pieces: piecesArray,
                 dose: doseArray,
                 category: categoryArray,
-                prescription: prescription
+                prescription: JSON.parse(prescription)
             });
 
             if (result.acknowledged === true) {
