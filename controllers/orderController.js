@@ -439,9 +439,11 @@ async function deleteOrder(id,res) {
     
     const result = await collection.deleteOne({ _id: id });
     if (result.deletedCount > 0) {
-      res
-        .status(200)
-        .json({ message: `order deleted ${id}`, status: "Success" });
+    //   res
+    //     .status(200)
+    //     .json({ message: `order deleted ${id}`, status: "Success" });
+
+    
     }
   } catch (error) {
     console.log(error)
