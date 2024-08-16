@@ -27,7 +27,7 @@ async function placeOrder(req, res) {
 
   if (
     !userId ||
-    !location
+    !location 
   ) {
     return res.status(400).json({
       status: "error",
@@ -46,7 +46,7 @@ async function placeOrder(req, res) {
     let validations = [];
     let requiresPrescription = false;
 
-    let parsedProducts;
+    let parsedProducts = [];
 try {
   parsedProducts = typeof products === 'string' ? JSON.parse(products) : products;
 } catch (error) {
@@ -54,7 +54,15 @@ try {
     status: "error",
     message: "Invalid products format",
   });
-}
+}console.log(parsedProducts, products);
+
+
+if (parsedProducts.length ==0 ) {
+    return res.status(400).json({
+      status: "error",
+      message: "Products are required",
+    });
+  }
 
 parsedProducts.forEach((product, index) => {
       if (!product.productId)
