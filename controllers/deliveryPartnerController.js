@@ -447,16 +447,27 @@ async function getAvailableOrders(req, res) {
   try {
     await client.connect();
     const db = client.db("ImmunePlus");
-    const collection = db.collection("ongoingOrders");
+    const ordersCollection = db.collection("acceptedOrders");
+    const pharmacyCollection = db.collection("Pharmacy"); // Change the collection to "pharmacies"
 
-    const orders = await collection
-      .find({ assignedPartner: null, assignedPharmacy: { $ne: null } })
-      .toArray();
-    res.json(orders);
+    const orders = await ordersCollection.find({ assignedPartner: null }).toArray();
+
+    // Enrich orders with pharmacy address
+    const enrichedOrders = await Promise.all(
+      orders.map(async (order) => {
+        const pharmacy = await pharmacyCollection.findOne({ _id: order.assignedPharmacy });
+        return {
+          ...order,
+          pharmacyAddress: pharmacy?.address || "Address not found", // Add the address to the order
+        };
+      })
+    );
+
+    res.json(enrichedOrders);
   } catch (error) {
-    res
-      .status(500)
-      .json({ message: "Failed to fetch Orders", error: error.message });
+    res.status(500).json({ message: "Failed to fetch Orders", error: error.message });
+  } finally {
+    await client.close(); // Ensure the client connection is closed after the operation
   }
 }
 

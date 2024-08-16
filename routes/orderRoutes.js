@@ -2,8 +2,10 @@ const express = require('express');
 const { placeOrder, getOrderbyId,receivePharmacyResponse, changeOrderStatus,getAll,getAvailableOrders } = require('../controllers/orderController');
 
 const router = express.Router();
+const multer = require("multer");
+const upload = multer({ storage: multer.memoryStorage() });
 
-router.post('/create', placeOrder);
+router.post('/create', upload.array('img', 10), placeOrder);
 router.get('/id', getOrderbyId);
 router.post('/request', receivePharmacyResponse);
 router.post('/status', changeOrderStatus);

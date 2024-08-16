@@ -27,13 +27,11 @@ async function placeOrder(req, res) {
 
   if (
     !userId ||
-    !Array.isArray(products) ||
-    products.length === 0 ||
     !location
   ) {
     return res.status(400).json({
       status: "error",
-      message: "userId, products, and location are required",
+      message: "userId and location are required",
     });
   }
 
@@ -46,7 +44,19 @@ async function placeOrder(req, res) {
     const availableOrderCollection = db.collection("ongoingOrders");
 
     let validations = [];
-    products.forEach((product, index) => {
+    let requiresPrescription = false;
+
+    let parsedProducts;
+try {
+  parsedProducts = typeof products === 'string' ? JSON.parse(products) : products;
+} catch (error) {
+  return res.status(400).json({
+    status: "error",
+    message: "Invalid products format",
+  });
+}
+
+parsedProducts.forEach((product, index) => {
       if (!product.productId)
         validations.push({
           key: `products[${index}].productId`,
@@ -77,21 +87,53 @@ async function placeOrder(req, res) {
           key: `products[${index}].name`,
           message: "Product Name is required",
         });
+        if (!product.prescription)
+            validations.push({
+              key: `products[${index}].prescription`,
+              message: "Product prescription is required",
+            });
+            if (product.prescription) {
+                requiresPrescription = true;
+              }
     });
 
     if (validations.length > 0) {
       return res.status(400).json({ status: "error", validations });
     }
 
+    if (requiresPrescription) {
+        if (!req.files || req.files.length === 0) {
+          return res.status(400).json({
+            status: "error",
+            message: "Prescription images are required for certain products.",
+          });
+        }
+      }
+
     const session = client.startSession();
     let newOrderId, newPayementId;
     await session.withTransaction(async () => {
+
+
       const counter = await countersCollection.findOneAndUpdate(
         { _id: "orderId" },
         { $inc: { seq: 1 } },
         { upsert: true, returnDocument: "after" }
       );
       newOrderId = counter.seq;
+      let prescriptionImagePaths = [];
+      if (requiresPrescription) {
+        const directoryPath = path.join('uploads/order/prescription', `${newOrderId}`);
+        if (!fs.existsSync(directoryPath)) {
+          fs.mkdirSync(directoryPath, { recursive: true });
+        }
+
+        req.files.forEach((file, index) => {
+          const filePath = path.join(directoryPath, `${newOrderId}-${index + 1}.jpg`);
+          fs.writeFileSync(filePath, file.buffer);
+          prescriptionImagePaths.push(filePath);
+        });
+      }
 
       const counter2 = await countersCollection.findOneAndUpdate(
         { _id: "payementId" },
@@ -100,7 +142,7 @@ async function placeOrder(req, res) {
       );
       newPayementId = counter2.seq;
 
-      let totalPrice = products.reduce((total, item) => total + item.price, 0);
+      let totalPrice = parsedProducts.reduce((total, item) => total + item.price, 0);
       let amountToBePaid = totalPrice - (totalPrice * 15) / 100;
       const dateInIST = new Date().toLocaleString("en-US", {
         timeZone: "Asia/Kolkata",
@@ -108,13 +150,14 @@ async function placeOrder(req, res) {
       const order = {
         _id: newOrderId,
         userId,
-        products: products.map((product) => ({
+        products: parsedProducts.map((product) => ({
           productId: parseFloat(product.productId),
           name: product.name,
           price: parseFloat(product.price),
           pieces: parseFloat(product.pieces),
           dose: parseFloat(product.dose),
           quantity: parseInt(product.quantity),
+          prescription: product.prescription
         })),
         location,
         status: 0,
@@ -122,6 +165,7 @@ async function placeOrder(req, res) {
         assignedPharmacy: null,
         totalPrice: totalPrice,
         assignedPartner: null,
+        prescriptionImg: prescriptionImagePaths,
       };
 
       const paymentInfo = {
@@ -163,7 +207,7 @@ async function placeOrder(req, res) {
 
 async function receivePharmacyResponse(req, res) {
   const { orderId, pharmacyId, products } = req.body;
-  console.log(orderId, pharmacyId, products);
+//   console.log(orderId, pharmacyId, products);
 
   if (!orderId || !pharmacyId || !Array.isArray(products)) {
     return res.status(400).json({
@@ -257,7 +301,7 @@ async function assignOrderToPharmacy(orderId, pharmacyId) {
     const db = client.db("ImmunePlus");
     const ordersCollection = db.collection("Orders");
     const paymentCollection = db.collection("paymentOrder");
-    const availableOrderCollection = db.collection("ongoingOrders");
+    const acceptedOrders = db.collection("acceptedOrders");
 
     await ordersCollection.updateOne(
       { _id: orderId },
@@ -267,12 +311,15 @@ async function assignOrderToPharmacy(orderId, pharmacyId) {
       { orderId: orderId },
       { $set: { PartnerId: pharmacyId } }
     );
+
+
     //await availableOrderCollection.deleteOne({ _id: orderId });
 
     const order = await ordersCollection.findOne({ _id: parseInt(orderId) });
     if (!order) {
       throw new Error(`Order with ID ${orderId} not found`);
     }
+    await acceptedOrders.insertOne(order);
     let userId = order.userId;
 
     //let message =`Order ${orderId} assigned to your Pharmacy. Please pack the order accordingly. Our rider is on the way.`
@@ -384,20 +431,20 @@ async function getAvailableOrders(req, res) {
   }
 }
 
-async function deleteOrder(id) {
+async function deleteOrder(id,res) {
   try {
     await client.connect();
     const db = client.db("ImmunePlus");
     const collection = db.collection("ongoingOrders");
-
+    
     const result = await collection.deleteOne({ _id: id });
-
     if (result.deletedCount > 0) {
       res
         .status(200)
         .json({ message: `order deleted ${id}`, status: "Success" });
     }
   } catch (error) {
+    console.log(error)
     console.log("An error occurred during deletion");
   } finally {
     //await client.close();

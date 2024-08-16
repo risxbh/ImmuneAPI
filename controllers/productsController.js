@@ -19,7 +19,7 @@ const upload = multer({ storage });
 async function create(req, res) {
     try {
         await client.connect();
-        const { name, description, price, pieces, dose, category } = req.body;
+        const { name, description, price, pieces, dose, category, prescription } = req.body;
         const db = client.db("ImmunePlus");
         const collection = db.collection("Products");
         const countersCollection = db.collection("Counters");
@@ -32,6 +32,7 @@ async function create(req, res) {
         if (!pieces) validations.push({ key: 'pieces', message: 'Pieces is required' });
         if (!dose) validations.push({ key: 'dose', message: 'Dose is required' });
         if (!category) validations.push({ key: 'category', message: 'At least 1 Category is required' });
+        if (!prescription) validations.push({ key: 'prescription', message: 'Please tell prescription true or false' });
         if (!req.file || !req.file.buffer) validations.push({ key: 'img', message: 'Image is required' });
 
         if (validations.length) {
@@ -106,7 +107,8 @@ async function create(req, res) {
                 price,
                 pieces: piecesArray,
                 dose: doseArray,
-                category: categoryArray
+                category: categoryArray,
+                prescription: prescription
             });
 
             if (result.acknowledged === true) {
