@@ -68,7 +68,7 @@ async function createPayment(req, res) {
     } catch (error) {
         res.status(500).json({ status: 'error', message: 'An error occurred while creating the payment', reason: error.message });
     } finally {
-        await client.close();
+        // await client.close();
     }
 }
 

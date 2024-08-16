@@ -120,7 +120,7 @@ async function create(req, res) {
     } catch (error) {
         res.status(500).json({ message: 'Failed to create product', error: error.message });
     } finally {
-        await client.close();
+        //await client.close();
     }
 }
 async function getAllProducts(req, res) {
@@ -192,7 +192,7 @@ async function update(req, res) {
     } catch (error) {
         res.status(500).json({ message: 'Failed to update Product', error: error.message });
     } finally {
-        await client.close();
+        //await client.close();
     }
 }
 

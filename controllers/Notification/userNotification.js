@@ -212,7 +212,7 @@ cron.schedule('* * * * *', async () => {
     } catch (error) {
         console.error('Error checking bookings:', error);
     } finally {
-        await client.close();
+        // await client.close();
     }
 });
 
@@ -284,7 +284,7 @@ async function sendUserNotification(userId,orderId, type) {
     } catch (error) {
         console.error('Error sending notification:', error.message);
     } finally {
-        await client.close();
+        // await client.close();
     }
 }
 

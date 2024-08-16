@@ -64,7 +64,7 @@ async function loginUser(req, res) {
             res.status(400).json({ status: 'error', message: 'Invalid email or password' });
         }
     } finally {
-        // await client.close();
+        await client.close();
     }
 }
 
@@ -167,7 +167,7 @@ async function registerUser(req, res) {
     } catch (error) {
         res.status(500).json({ status: 'error', message: 'An error occurred during registration', reason: error });
     } finally {
-        await client.close();
+        // await client.close();
     }
 }
 
@@ -227,7 +227,7 @@ async function updateUser(req, res) {
     } catch (error) {
         res.status(500).json({ status: 'error', message: 'An error occurred during update', reason: error });
     } finally {
-        await client.close();
+        // await client.close();
     }
 }
 
@@ -262,7 +262,7 @@ async function deleteUser(req, res) {
     } catch (error) {
         res.status(500).json({ status: 'error', message: 'An error occurred during deletion', reason: error });
     } finally {
-        await client.close();
+        // await client.close();
     }
 }
 

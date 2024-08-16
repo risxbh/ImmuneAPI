@@ -203,7 +203,7 @@ async function sendDoctorNotification(userId,bookingId, type) {
     } catch (error) {
         console.error('Error sending notification:', error.message);
     } finally {
-        await client.close();
+        //await client.close();
     }
 }
 

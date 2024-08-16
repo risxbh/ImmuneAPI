@@ -216,7 +216,7 @@ async function sendPharmaNotification(userId,orderId, type) {
     } catch (error) {
         console.error('Error sending notification:', error.message);
     } finally {
-        await client.close();
+        //await client.close();
     }
 }
 

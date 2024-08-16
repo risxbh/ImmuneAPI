@@ -467,7 +467,7 @@ async function getAvailableOrders(req, res) {
   } catch (error) {
     res.status(500).json({ message: "Failed to fetch Orders", error: error.message });
   } finally {
-    await client.close(); // Ensure the client connection is closed after the operation
+    // await client.close(); // Ensure the client connection is closed after the operation
   }
 }
 
@@ -573,7 +573,7 @@ async function assignOrderToPartner(req, res) {
     console.error("Error assigning order to pharmacy:", error);
     res.status(500).json({ status: "error", message: "Internal server error" });
   } finally {
-    // await client.close();
+    await client.close();
   }
 }
 async function getUserbyId(req, res) {
