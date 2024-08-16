@@ -54,7 +54,7 @@ try {
     status: "error",
     message: "Invalid products format",
   });
-}console.log(parsedProducts, products);
+}
 
 
 if (parsedProducts.length ==0 ) {

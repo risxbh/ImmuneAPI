@@ -125,6 +125,7 @@ async function create(req, res) {
 }
 async function getAllProducts(req, res) {
     try {
+        await client.connect()
         const db = client.db("ImmunePlus");
         const collection = db.collection("Products");
 
@@ -199,6 +200,7 @@ async function update(req, res) {
 async function remove(req, res) {
     try {
         const { id } = req.body;
+        await client.connect()
         const db = client.db("ImmunePlus");
         const collection = db.collection("Products");
 
@@ -224,6 +226,7 @@ async function getProductById(req, res) {
         return;
     }
     try {
+        await client.connect();
         const db = client.db("ImmunePlus");
         const collection = db.collection("Products");
         const product = await collection.find({_id: parseInt(id) }).toArray();
