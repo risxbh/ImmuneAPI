@@ -431,7 +431,7 @@ async function getAvailableOrders(req, res) {
   }
 }
 
-async function deleteOrder(id,res) {
+async function deleteOrder(id) {
   try {
     await client.connect();
     const db = client.db("ImmunePlus");
@@ -443,7 +443,7 @@ async function deleteOrder(id,res) {
     //     .status(200)
     //     .json({ message: `order deleted ${id}`, status: "Success" });
 
-    
+
     }
   } catch (error) {
     console.log(error)
