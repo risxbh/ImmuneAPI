@@ -9,25 +9,52 @@ const client = new MongoClient(url, {
         deprecationErrors: true,
     }
 });
+const fast2sms = require('fast-two-sms')
 
 // User login controller
+const unirest = require('unirest'); // To send OTP via Fast2SMS
+const OTP_EXPIRY_TIME = 5 * 60 * 1000; // 5 minutes
+let otpStorage = {}; // Temporary in-memory storage for OTPs
+const crypto = require('crypto'); 
+async function sendOTP(phoneNumber, otp) {
+    const apiKey = '30YlkFZVrtRHCnOIs7PDUajxwEB4evX1SfmW8cMQiGJhLTpbz6FaB3tfYDXniMQNkThgoylJPA8VH15E';
+    // var options = {authorization : apiKey , message : `Your OTP is ${otp}. It is valid for 5 minutes.` ,  numbers : ['7477367855']}
+    // fast2sms.sendMessage(options).then(response=>{
+    //     console.log(response)
+    //   })
+    
+    try {
+        await fast2sms.sendMessage({
+            authorization: apiKey,
+            message: `Your OTP is ${otp}. It is valid for 5 minutes.`,
+            numbers: [`${phoneNumber}`],
+            sender_id: "IMMPLUS"
+        }).then((res)=>{
+            console.log(res)
+        }).catch((err)=>{
+            console.log(err);
+            
+        })
+        // console.log('OTP sent successfully:', response);
+    } catch (error) {
+        console.error('Error sending OTP:', error.message);
+    }
+}
+
 async function loginUser(req, res) {
-    const { phoneNumber, password } = req.body;
+    const { phoneNumber, otp } = req.body;
     let validations = [];
     let phoneNumMessage = '';
 
-    if (!password) validations.push({ key: 'password', message: 'Password is required' });
-    if (phoneNumber) {
-        if (phoneNumber.length < 10 || phoneNumber.length > 10) {
-            phoneNumMessage = 'Phone Number should habe 10 digits.';
-        }
-    } else {
+    if (!phoneNumber) {
         phoneNumMessage = 'Phone Number is required.';
+    } else if (phoneNumber.length < 10 || phoneNumber.length > 10) {
+        phoneNumMessage = 'Phone Number should habe 10 digits.';
     }
+
     if (phoneNumMessage) {
         validations.push({ key: 'Phone Number', message: phoneNumMessage });
     }
-
 
     if (validations.length) {
         res.status(400).json({ status: 'error', validations: validations });
@@ -35,36 +62,53 @@ async function loginUser(req, res) {
     }
 
     try {
-        await client.connect();
-        const db = client.db("ImmunePlus");
-        const collection = db.collection("Users");
-        const user = await collection.findOne({ phoneNumber: phoneNumber });
+        if (otp) {
+            // OTP verification
+            const storedOtp = otpStorage[phoneNumber];
+            if (storedOtp && Date.now() < storedOtp.expiry) {
+                if (storedOtp.value === otp) {
+                    // Successful OTP verification
+                    await client.connect();
+                    const db = client.db("ImmunePlus");
+                    const collection = db.collection("Users");
+                    
+                    const user = await collection.findOne({ phoneNumber: phoneNumber });
+                    if (user) {
+                        const userInfo = {
+                            fullName: user.fullName,
+                            id: user._id,
+                            gender: user.gender,
+                            address: user.address,
+                            state: user.state,
+                            ageGroup: user.ageGroup,
+                            email: user.email,
+                            pincode: user.pincode,
+                            phoneNumber: user.phoneNumber,
+                            previousHistory: user.previousHistory
+                        };
 
-        if (user) {
-            const result = await bcrypt.compare(password, user.password);
-            if (result) {
-                const userInfo = {
-                    fullName: user.fullName,
-                    id: user._id,
-                    gender: user.gender,
-                    address: user.address,
-                    state: user.state,
-                    ageGroup: user.ageGroup,
-                    email: user.email,
-                    pincode: user.pincode,
-                    phoneNumber: user.phoneNumber,
-                    previousHistory: user.previousHistory
-                };
-
-                res.json({ status: 'success', message: 'Login successfull!', user: userInfo });
+                        res.json({ status: 'success', message: 'Login successful!', user: userInfo });
+                    } else {
+                        res.status(400).json({ status: 'error', message: 'Invalid Phone Number' });
+                    }
+                    
+                    client.close();
+                } else {
+                    res.status(400).json({ status: 'error', message: 'Invalid OTP' });
+                }
             } else {
-                res.status(400).json({ status: 'error', message: 'Invalid Phone Number or password' });
+                res.status(400).json({ status: 'error', message: 'OTP expired or invalid' });
             }
         } else {
-            res.status(400).json({ status: 'error', message: 'Invalid email or password' });
+            // Generate and send OTP
+            const otp = crypto.randomInt(100000, 999999).toString();
+            otpStorage[phoneNumber] = { value: otp, expiry: Date.now() + OTP_EXPIRY_TIME };
+
+            await sendOTP(phoneNumber, otp);
+            res.json({ status: 'success', message: 'OTP sent to your phone number' });
         }
-    } finally {
-        await client.close();
+    } catch (error) {
+        res.status(500).json({ status: 'error', message: 'Internal Server Error', error: error.message });
     }
 }
 
