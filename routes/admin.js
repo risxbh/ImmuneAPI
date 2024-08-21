@@ -2,7 +2,7 @@ const express = require('express');
 const {
     changeDocter,
     changePharmacy,
-    changeDeliveryPartner, login
+    changeDeliveryPartner, login, getPendingRequests
 } = require('../controllers/adminController');
 
 const router = express.Router();
@@ -11,5 +11,6 @@ router.post('/changeDocterStatus', changeDocter);
 router.get('/changePharmaStatus', changePharmacy);
 router.post('/changeDelParStatus', changeDeliveryPartner);
 router.post('/login', login);
+router.post('/getPending', getPendingRequests);
 
 module.exports = router;

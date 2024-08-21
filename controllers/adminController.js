@@ -123,11 +123,42 @@ async function changeDocter(req, res) {
     }
 }
 
+async function getPendingRequests(req, res) {
+    try {
+        await client.connect();
+        const db = client.db("ImmunePlus");
+  
+        // Fetch pending doctor requests
+        const doctorsCollection = db.collection("Doctors");
+        const pendingDoctors = await doctorsCollection.find({ isApproved: { $in: [0] } }).toArray();
+  
+        // Fetch pending delivery partner requests
+        const deliveryPartnerCollection = db.collection("DeliveryPartner");
+        const pendingDeliveryPartners = await deliveryPartnerCollection.find({ isApproved: { $in: [0] } }).toArray();
+  
+        // Fetch pending pharmacy requests
+        const pharmacyCollection = db.collection("Pharmacy");
+        const pendingPharmacies = await pharmacyCollection.find({ isApproved: { $in: [0] } }).toArray();
+  
+        // Combine all pending requests into a single response
+        const pendingRequests = {
+            doctors: pendingDoctors,
+            deliverypartners: pendingDeliveryPartners,
+            pharmacies: pendingPharmacies,
+        };
+  
+        res.status(200).json(pendingRequests);
+    } catch (error) {
+        res.status(500).json({ message: "Failed to fetch pending requests", error: error.message });
+    }
+  }
+
 
 
 module.exports = {
     changeDocter,
     changePharmacy,
     changeDeliveryPartner,
-    login
+    login,
+    getPendingRequests
 };
