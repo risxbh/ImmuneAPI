@@ -94,10 +94,40 @@ async function changeDocter(req, res) {
     }
   }
 
+  async function login(req, res) {
+    const { username, password } = req.body;
+    let validations = [];
+
+    if (!password) validations.push({ key: 'password', message: 'Password is required' });
+    if (!username) validations.push({ key: 'username', message: 'Username is required' });
+
+
+    if (validations.length) {
+        res.status(400).json({ status: 'error', validations: validations });
+        return;
+    }
+
+    try {
+        await client.connect();
+        const db = client.db("ImmunePlus");
+        const collection = db.collection("Admin");
+        const user = await collection.findOne({ username: username, password: password });
+
+        if (user) {
+                res.json({ status: 'success', message: 'Login successfull!' });
+        } else {
+            res.status(400).json({ status: 'error', message: 'Invalid Username or password' });
+        }
+    } finally {
+        //await client.close();
+    }
+}
+
 
 
 module.exports = {
     changeDocter,
     changePharmacy,
     changeDeliveryPartner,
+    login
 };
