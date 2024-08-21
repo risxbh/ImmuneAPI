@@ -254,7 +254,8 @@ async function registerDoctor(req, res) {
                 password: hashedPassword,
                 name, hospital, about, type, patients, experience, rating, location, specialist, videoFee, appointmentFee, email,workinghours,
                 _id: newId,
-                accountNumber, ifscCode, accountHolderName, bankName
+                accountNumber, ifscCode, accountHolderName, bankName,
+                isApproved: 0
             });
 
             if (result.acknowledged === true) {
@@ -389,6 +390,7 @@ async function loginDoctor(req, res) {
         if (user) {
             const result = await bcrypt.compare(password, user.password);
             if (result) {
+                if(user.isApproved == 1){
                 const userInfo = {
                     name: user.name,
                     id: user._id,
@@ -409,6 +411,11 @@ async function loginDoctor(req, res) {
                 };
 
                 res.json({ status: 'success', message: 'Login successfull!', user: userInfo });
+            }else if(user.isApproved == 2){
+                res.json({ status: 'decline', message: 'Your Profile is been Declined' });
+            }else {
+                res.json({ status: 'pending', message: 'Your Profile is not been approved' });
+            }
             } else {
                 res.status(400).json({ status: 'error', message: 'Invalid Email or password' });
             }

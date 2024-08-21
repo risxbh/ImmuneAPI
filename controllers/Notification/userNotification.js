@@ -216,7 +216,7 @@ cron.schedule('* * * * *', async () => {
     }
 });
 
-async function sendUserNotification(userId,orderId, type) {
+async function sendUserNotification(userId,orderId, type,otp) {
     console.log(userId,orderId, type);
     try {
         await client.connect();
@@ -244,7 +244,7 @@ async function sendUserNotification(userId,orderId, type) {
         if (type == 1) {
             message = `Your Order ${orderId} has been recorded. We will try to find the best suitable pharmacy to get your Medicines.`;
         } else if (type == 2) {
-            message = `Your Order ${orderId} has been confirmed. We will try to find the best suitable pharmacy to get your Medicines.`;
+            message = `Your Order ${orderId} has been confirmed. Your Otp for order is ${otp}`;
         } else if (type == 3) {
             message = `Our Rider is on its way to the medical store to pick your Medicines for Order ${orderId}`;
         } else if (type == 4) {

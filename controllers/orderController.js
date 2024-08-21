@@ -155,6 +155,7 @@ parsedProducts.forEach((product, index) => {
       const dateInIST = new Date().toLocaleString("en-US", {
         timeZone: "Asia/Kolkata",
       });
+      const otp = Math.floor(1000 + Math.random() * 9000); 
       const order = {
         _id: newOrderId,
         userId,
@@ -174,6 +175,7 @@ parsedProducts.forEach((product, index) => {
         totalPrice: totalPrice,
         assignedPartner: null,
         prescriptionImg: prescriptionImagePaths,
+        otp: otp
       };
 
       const paymentInfo = {
@@ -367,7 +369,7 @@ async function getOrderbyId(req, res) {
 
 async function changeOrderStatus(req, res) {
   try {
-    const { orderId, status } = req.body;
+    const { orderId, status, otp } = req.body;
     const db = client.db("ImmunePlus");
     const collection = db.collection("Orders");
     const paymentCollection = db.collection("paymentOrder");
@@ -381,10 +383,16 @@ async function changeOrderStatus(req, res) {
     const order = await collection.findOne({ _id: parseInt(orderId) });
 
     if (status == 7) {
+      if(otp == order.otp){
       await paymentCollection.updateOne(
         { orderId: orderId },
         { $set: { PartnerId: order.assignedPharmacy, status: 7 } }
       );
+    }else{
+      res
+        .status(400)
+        .json({ status: "error", message: "Invalid Otp" });
+    }
     }
     if (result.modifiedCount === 1) {
       let userId = order.userId;
@@ -396,7 +404,7 @@ async function changeOrderStatus(req, res) {
         pharmacyId,
       });
       sendPharmaNotification(order.assignedPharmacy, order._id, status);
-      sendUserNotification(order.userId, order._id, status);
+      sendUserNotification(order.userId, order._id, status,order.otp);
 
       // Send success response
       res.status(200).json({ status: "success", message: "Status Updated" });

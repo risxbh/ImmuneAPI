@@ -171,6 +171,7 @@ async function registerDelivery(req, res) {
         ifscCode,
         accountHolderName,
         bankName,
+        isApproved: 0
       });
 
       if (result.acknowledged) {
@@ -227,6 +228,7 @@ async function loginDelivery(req, res) {
     if (user) {
       const result = await bcrypt.compare(password, user.password);
       if (result) {
+        if(user.isApproved == 1){
         const userInfo = {
           fullName: user.fullName,
           id: user._id,
@@ -244,6 +246,11 @@ async function loginDelivery(req, res) {
           message: "Login successful!",
           user: userInfo,
         });
+      }else if(user.isApproved == 2){
+        res.json({ status: 'decline', message: 'Your Profile is been Declined' });
+    }else {
+        res.json({ status: 'pending', message: 'Your Profile is not been approved' });
+    }
       } else {
         res.status(400).json({
           status: "error",
