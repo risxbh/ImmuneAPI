@@ -11,6 +11,6 @@ router.post('/changeDocterStatus', changeDocter);
 router.get('/changePharmaStatus', changePharmacy);
 router.post('/changeDelParStatus', changeDeliveryPartner);
 router.post('/login', login);
-router.post('/getPending', getPendingRequests);
+router.get('/getPending', getPendingRequests);
 
 module.exports = router;
