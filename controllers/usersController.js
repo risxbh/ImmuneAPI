@@ -11,8 +11,6 @@ const client = new MongoClient(url, {
 });
 const fast2sms = require('fast-two-sms')
 
-// User login controller
-const unirest = require('unirest'); // To send OTP via Fast2SMS
 const OTP_EXPIRY_TIME = 5 * 60 * 1000; // 5 minutes
 let otpStorage = {}; // Temporary in-memory storage for OTPs
 const crypto = require('crypto'); 
@@ -24,12 +22,14 @@ async function sendOTP(phoneNumber, otp) {
     //   })
     
     try {
-        await fast2sms.sendMessage({
+        const options = {
             authorization: apiKey,
             message: `Your OTP is ${otp}. It is valid for 5 minutes.`,
-            numbers: [`${phoneNumber}`],
-            sender_id: "IMMPLUS"
-        }).then((res)=>{
+            numbers: [phoneNumber], // Pass numbers as an array
+            sender_id: 'IMMPLUS', // Specify the sender ID here
+            route: 'otp' // Ensure this route is correct
+        };
+        await fast2sms.sendMessage(options).then((res)=>{
             console.log(res)
         }).catch((err)=>{
             console.log(err);
