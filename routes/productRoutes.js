@@ -3,7 +3,7 @@ const { create, getAllProducts, upload, update,remove, getProductById } = requir
 
 const router = express.Router();
 
-router.post('/create', upload.single('img'), create);
+router.post('/create', create);
 router.get('/records', getAllProducts);
 router.post('/update',upload.single('img'), update);
 router.post('/delete', remove);
