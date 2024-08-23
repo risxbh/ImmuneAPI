@@ -44,7 +44,6 @@ async function placeOrder(req, res) {
     const availableOrderCollection = db.collection("ongoingOrders");
 
     let validations = [];
-    console.log(prescription);
     
     if (prescription == "true" || prescription == undefined) {
       if (!req.files || req.files.length === 0) {
@@ -327,6 +326,30 @@ async function getOrderbyId(req, res) {
 async function changeOrderStatus(req, res) {
   try {
     const { orderId, status, otp } = req.body;
+    let validations = [];
+
+    // Basic validations
+    if (!orderId) {
+      validations.push({ key: 'orderId', message: 'Order Id is required' });
+    }
+
+    if (!status) {
+      validations.push({ key: 'status', message: 'Status is required' });
+    }
+
+    // Additional validation for status 7 (where OTP is required)
+    if (status == '7' || status == 7) {
+      if (!otp) {
+        validations.push({ key: 'otp', message: 'OTP is required' });
+      }
+    }
+
+    // Return early if there are any validation errors
+    if (validations.length) {
+      res.status(400).json({ status: 'error', validations: validations });
+      return;
+    }
+
     const db = client.db("ImmunePlus");
     const collection = db.collection("Orders");
     const paymentCollection = db.collection("paymentOrder");
@@ -337,21 +360,25 @@ async function changeOrderStatus(req, res) {
       { _id: parseInt(orderId) },
       { $set: updateFields }
     );
+
     const order = await collection.findOne({ _id: parseInt(orderId) });
 
+    // Check for OTP if status is 7
     if (status == 7) {
-      if(otp == order.otp){
+      if (otp != order.otp) {
+        res.status(400).json({ status: "error", message: "Invalid OTP" });
+        return; // Return early if OTP is incorrect
+      }
+
+      // Update payment order if OTP is valid
       await paymentCollection.updateOne(
         { orderId: orderId },
         { $set: { PartnerId: order.assignedPharmacy, status: 7 } }
       );
-    }else{
-      res
-        .status(400)
-        .json({ status: "error", message: "Invalid Otp" });
     }
-    }
+
     if (result.modifiedCount === 1) {
+      // Notify other parts of the system about the status change
       let userId = order.userId;
       let pharmacyId = order.pharmacyId;
       global.io.emit("orderStatusChanged", {
@@ -360,15 +387,15 @@ async function changeOrderStatus(req, res) {
         userId,
         pharmacyId,
       });
+
+      // Send notifications to pharmacy and user
       sendPharmaNotification(order.assignedPharmacy, order._id, status);
-      sendUserNotification(order.userId, order._id, status,order.otp);
+      sendUserNotification(order.userId, order._id, status, order.otp);
 
       // Send success response
       res.status(200).json({ status: "success", message: "Status Updated" });
     } else {
-      res
-        .status(400)
-        .json({ status: "error", message: "Status update failed" });
+      res.status(400).json({ status: "error", message: "Status update failed" });
     }
   } catch (error) {
     res
@@ -376,6 +403,7 @@ async function changeOrderStatus(req, res) {
       .json({ message: "Failed to update status", error: error.message });
   }
 }
+
 
 async function getAll(req, res) {
   try {
