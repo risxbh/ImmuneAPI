@@ -123,16 +123,37 @@ async function create(req, res) {
         //await client.close();
     }
 }
+
+//http://localhost:5000/product/records?page=2&limit=5
 async function getAllProducts(req, res) {
     try {
-        await client.connect()
+        await client.connect();
         const db = client.db("ImmunePlus");
         const collection = db.collection("Products");
 
-        const categories = await collection.find().toArray();
-        res.json(categories);
+        // Pagination parameters
+        const page = parseInt(req.query.page) || 1; // Default to page 1 if not provided
+        const limit = parseInt(req.query.limit) || 10; // Default to 10 items per page if not provided
+
+        const skip = (page - 1) * limit; // Calculate the number of items to skip
+
+        // Fetch products with pagination
+        const products = await collection.find().skip(skip).limit(limit).toArray();
+
+        // Get total number of products for calculating total pages
+        const totalProducts = await collection.countDocuments();
+        const totalPages = Math.ceil(totalProducts / limit);
+
+        res.json({
+            products,
+            currentPage: page,
+            totalPages,
+            totalProducts,
+        });
     } catch (error) {
-        res.status(500).json({ message: 'Failed to fetch product', error: error.message });
+        res.status(500).json({ message: 'Failed to fetch products', error: error.message });
+    } finally {
+        await client.close();
     }
 }
 

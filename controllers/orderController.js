@@ -23,7 +23,7 @@ const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
 async function placeOrder(req, res) {
-  const { userId, products, location } = req.body;
+  const { userId, products, location, prescription, totalPrice } = req.body;
 
   if (
     !userId ||
@@ -44,79 +44,27 @@ async function placeOrder(req, res) {
     const availableOrderCollection = db.collection("ongoingOrders");
 
     let validations = [];
-    let requiresPrescription = false;
+    console.log(prescription);
+    
+    if (prescription == "true" || prescription == undefined) {
+      if (!req.files || req.files.length === 0) {
+        return res.status(400).json({
+          status: "error",
+          message: "Prescription images are required for certain products.",
+        });
+      }
+    }
 
-    let parsedProducts = [];
-try {
-  parsedProducts = typeof products === 'string' ? JSON.parse(products) : products;
-} catch (error) {
-  return res.status(400).json({
-    status: "error",
-    message: "Invalid products format",
-  });
-}
-
-
-if (parsedProducts.length ==0 ) {
+if (products.length ==0 ) {
     return res.status(400).json({
       status: "error",
       message: "Products are required",
     });
   }
 
-parsedProducts.forEach((product, index) => {
-      if (!product.productId)
-        validations.push({
-          key: `products[${index}].productId`,
-          message: "Product ID is required",
-        });
-      if (!product.price)
-        validations.push({
-          key: `products[${index}].price`,
-          message: "Price is required",
-        });
-      if (!product.pieces)
-        validations.push({
-          key: `products[${index}].pieces`,
-          message: "Pieces are required",
-        });
-      if (!product.dose)
-        validations.push({
-          key: `products[${index}].dose`,
-          message: "Dose is required",
-        });
-      if (!product.quantity)
-        validations.push({
-          key: `products[${index}].quantity`,
-          message: "Quantity is required",
-        });
-      if (!product.name)
-        validations.push({
-          key: `products[${index}].name`,
-          message: "Product Name is required",
-        });
-        if (!product.prescription)
-            validations.push({
-              key: `products[${index}].prescription`,
-              message: "Product prescription is required",
-            });
-            if (product.prescription) {
-                requiresPrescription = true;
-              }
-    });
-
     if (validations.length > 0) {
       return res.status(400).json({ status: "error", validations });
     }
-
-    if (requiresPrescription) {
-        if (!req.files || req.files.length === 0) {
-          return res.status(400).json({
-            status: "error",
-            message: "Prescription images are required for certain products.",
-          });
-        }
-      }
 
     const session = client.startSession();
     let newOrderId, newPayementId;
@@ -130,7 +78,7 @@ parsedProducts.forEach((product, index) => {
       );
       newOrderId = counter.seq;
       let prescriptionImagePaths = [];
-      if (requiresPrescription) {
+      if (prescription) {
         const directoryPath = path.join('uploads/order/prescription', `${newOrderId}`);
         if (!fs.existsSync(directoryPath)) {
           fs.mkdirSync(directoryPath, { recursive: true });
@@ -150,7 +98,7 @@ parsedProducts.forEach((product, index) => {
       );
       newPayementId = counter2.seq;
 
-      let totalPrice = parsedProducts.reduce((total, item) => total + item.price, 0);
+      // let totalPrice = parsedProducts.reduce((total, item) => total + item.price, 0);
       let amountToBePaid = totalPrice - (totalPrice * 15) / 100;
       const dateInIST = new Date().toLocaleString("en-US", {
         timeZone: "Asia/Kolkata",
@@ -159,15 +107,7 @@ parsedProducts.forEach((product, index) => {
       const order = {
         _id: newOrderId,
         userId,
-        products: parsedProducts.map((product) => ({
-          productId: parseFloat(product.productId),
-          name: product.name,
-          price: parseFloat(product.price),
-          pieces: parseFloat(product.pieces),
-          dose: parseFloat(product.dose),
-          quantity: parseInt(product.quantity),
-          prescription: product.prescription
-        })),
+        products: products,
         location,
         status: 0,
         date: dateInIST,
@@ -358,8 +298,25 @@ async function getOrderbyId(req, res) {
   try {
     const db = client.db("ImmunePlus");
     const collection = db.collection("Orders");
+    const productsCollection = db.collection("Products");
+
     const order = await collection.findOne({ _id: parseInt(id) });
-    res.json(order);
+    if (!order) {
+      return res.status(404).json({ status: "error", message: "Order not found" });
+    }
+
+
+       const productDetails = await productsCollection
+      .find({ _id: { $in: order.products.map(productId => parseInt(productId)) } })
+      .toArray();
+
+    // Attach the product details to the order
+    const orderWithProductDetails = {
+      ...order,
+      products: productDetails
+    };
+
+    res.json(orderWithProductDetails);
   } catch (error) {
     res
       .status(500)
