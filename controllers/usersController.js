@@ -122,13 +122,11 @@ async function loginUser(req, res) {
       res.json({ status: "success", message: "OTP sent to your phone number" });
     }
   } catch (error) {
-    res
-      .status(500)
-      .json({
-        status: "error",
-        message: "Internal Server Error",
-        error: error.message,
-      });
+    res.status(500).json({
+      status: "error",
+      message: "Internal Server Error",
+      error: error.message,
+    });
   }
 }
 
@@ -253,13 +251,11 @@ async function registerUser(req, res) {
       }
     }
   } catch (error) {
-    res
-      .status(500)
-      .json({
-        status: "error",
-        message: "An error occurred during registration",
-        reason: error,
-      });
+    res.status(500).json({
+      status: "error",
+      message: "An error occurred during registration",
+      reason: error,
+    });
   } finally {
     // await client.close();
   }
@@ -343,13 +339,11 @@ async function updateUser(req, res) {
         .json({ status: "error", message: "Failed to update user" });
     }
   } catch (error) {
-    res
-      .status(500)
-      .json({
-        status: "error",
-        message: "An error occurred during update",
-        reason: error,
-      });
+    res.status(500).json({
+      status: "error",
+      message: "An error occurred during update",
+      reason: error,
+    });
   } finally {
     // await client.close();
   }
@@ -388,13 +382,11 @@ async function deleteUser(req, res) {
         .json({ status: "error", message: "Failed to delete user" });
     }
   } catch (error) {
-    res
-      .status(500)
-      .json({
-        status: "error",
-        message: "An error occurred during deletion",
-        reason: error,
-      });
+    res.status(500).json({
+      status: "error",
+      message: "An error occurred during deletion",
+      reason: error,
+    });
   } finally {
     // await client.close();
   }
@@ -460,6 +452,65 @@ async function getUserAppointment(req, res) {
   }
 }
 
+async function dummyLoginUser(req, res) {
+  const { phoneNumber } = req.body;
+  let validations = [];
+  let phoneNumMessage = "";
+
+  if (!phoneNumber) {
+    phoneNumMessage = "Phone Number is required.";
+  } else if (phoneNumber.length < 10 || phoneNumber.length > 10) {
+    phoneNumMessage = "Phone Number should habe 10 digits.";
+  }
+
+  if (phoneNumMessage) {
+    validations.push({ key: "Phone Number", message: phoneNumMessage });
+  }
+
+  if (validations.length) {
+    res.status(400).json({ status: "error", validations: validations });
+    return;
+  }
+
+  try {
+    // Successful OTP verification
+    await client.connect();
+    const db = client.db("ImmunePlus");
+    const collection = db.collection("Users");
+
+    const user = await collection.findOne({ phoneNumber: phoneNumber });
+    if (user) {
+      const userInfo = {
+        fullName: user.fullName,
+        id: user._id,
+        gender: user.gender,
+        address: user.address,
+        state: user.state,
+        ageGroup: user.ageGroup,
+        email: user.email,
+        pincode: user.pincode,
+        phoneNumber: user.phoneNumber,
+        previousHistory: user.previousHistory,
+      };
+
+      res.json({
+        status: "success",
+        message: "Login successful!",
+        user: userInfo,
+      });
+    } else {
+      res
+        .status(400)
+        .json({ status: "error", message: "Invalid Phone Number" });
+    }
+  } catch (error) {
+    res.status(500).json({
+      status: "error",
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+}
 module.exports = {
   loginUser,
   registerUser,
@@ -468,4 +519,5 @@ module.exports = {
   getAll,
   getUserbyId,
   getUserAppointment,
+  dummyLoginUser,
 };
