@@ -23,15 +23,41 @@ const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
 async function placeOrder(req, res) {
-  const { userId, products, location, prescription, totalPrice } = req.body;
+  const { userId, products, location, prescription, totalPrice, quantity } =
+    req.body;
 
-  if (
-    !userId ||
-    !location 
-  ) {
+  // Parse products and quantity
+  let parsedProducts = [];
+  let parsedQuantity = [];
+
+  try {
+    parsedProducts = JSON.parse(products);
+    parsedQuantity = JSON.parse(quantity); // Parse the quantity field
+  } catch (error) {
+    return res.status(400).json({
+      status: "error",
+      message: "Invalid products or quantity data format",
+    });
+  }
+
+  if (!userId || !location) {
     return res.status(400).json({
       status: "error",
       message: "userId and location are required",
+    });
+  }
+
+  if (parsedProducts.length === 0 || parsedQuantity.length === 0) {
+    return res.status(400).json({
+      status: "error",
+      message: "Products and quantities are required",
+    });
+  }
+
+  if (parsedProducts.length !== parsedQuantity.length) {
+    return res.status(400).json({
+      status: "error",
+      message: "The number of products and quantities must match",
     });
   }
 
@@ -44,8 +70,8 @@ async function placeOrder(req, res) {
     const availableOrderCollection = db.collection("ongoingOrders");
 
     let validations = [];
-    
-    if (prescription == "true" || prescription == undefined) {
+
+    if (prescription === "true" || prescription === undefined) {
       if (!req.files || req.files.length === 0) {
         return res.status(400).json({
           status: "error",
@@ -54,13 +80,6 @@ async function placeOrder(req, res) {
       }
     }
 
-if (products.length ==0 ) {
-    return res.status(400).json({
-      status: "error",
-      message: "Products are required",
-    });
-  }
-
     if (validations.length > 0) {
       return res.status(400).json({ status: "error", validations });
     }
@@ -68,23 +87,28 @@ if (products.length ==0 ) {
     const session = client.startSession();
     let newOrderId, newPayementId;
     await session.withTransaction(async () => {
-
-
       const counter = await countersCollection.findOneAndUpdate(
         { _id: "orderId" },
         { $inc: { seq: 1 } },
         { upsert: true, returnDocument: "after" }
       );
       newOrderId = counter.seq;
+
       let prescriptionImagePaths = [];
       if (prescription) {
-        const directoryPath = path.join('uploads/order/prescription', `${newOrderId}`);
+        const directoryPath = path.join(
+          "uploads/order/prescription",
+          `${newOrderId}`
+        );
         if (!fs.existsSync(directoryPath)) {
           fs.mkdirSync(directoryPath, { recursive: true });
         }
 
         req.files.forEach((file, index) => {
-          const filePath = path.join(directoryPath, `${newOrderId}-${index + 1}.jpg`);
+          const filePath = path.join(
+            directoryPath,
+            `${newOrderId}-${index + 1}.jpg`
+          );
           fs.writeFileSync(filePath, file.buffer);
           prescriptionImagePaths.push(filePath);
         });
@@ -97,16 +121,16 @@ if (products.length ==0 ) {
       );
       newPayementId = counter2.seq;
 
-      // let totalPrice = parsedProducts.reduce((total, item) => total + item.price, 0);
       let amountToBePaid = totalPrice - (totalPrice * 15) / 100;
       const dateInIST = new Date().toLocaleString("en-US", {
         timeZone: "Asia/Kolkata",
       });
-      const otp = Math.floor(1000 + Math.random() * 9000); 
+      const otp = Math.floor(1000 + Math.random() * 9000);
       const order = {
         _id: newOrderId,
         userId,
-        products: products,
+        products: parsedProducts, // Use parsedProducts
+        quantity: parsedQuantity, // Add parsedQuantity to the order
         location,
         status: 0,
         date: dateInIST,
@@ -114,7 +138,7 @@ if (products.length ==0 ) {
         totalPrice: totalPrice,
         assignedPartner: null,
         prescriptionImg: prescriptionImagePaths,
-        otp: otp
+        otp: otp,
       };
 
       const paymentInfo = {
@@ -156,7 +180,7 @@ if (products.length ==0 ) {
 
 async function receivePharmacyResponse(req, res) {
   const { orderId, pharmacyId, products } = req.body;
-//   console.log(orderId, pharmacyId, products);
+  //   console.log(orderId, pharmacyId, products);
 
   if (!orderId || !pharmacyId || !Array.isArray(products)) {
     return res.status(400).json({
@@ -261,7 +285,6 @@ async function assignOrderToPharmacy(orderId, pharmacyId) {
       { $set: { PartnerId: pharmacyId } }
     );
 
-
     //await availableOrderCollection.deleteOne({ _id: orderId });
 
     const order = await ordersCollection.findOne({ _id: parseInt(orderId) });
@@ -301,18 +324,21 @@ async function getOrderbyId(req, res) {
 
     const order = await collection.findOne({ _id: parseInt(id) });
     if (!order) {
-      return res.status(404).json({ status: "error", message: "Order not found" });
+      return res
+        .status(404)
+        .json({ status: "error", message: "Order not found" });
     }
 
-
-       const productDetails = await productsCollection
-      .find({ _id: { $in: order.products.map(productId => parseInt(productId)) } })
+    const productDetails = await productsCollection
+      .find({
+        _id: { $in: order.products.map((productId) => parseInt(productId)) },
+      })
       .toArray();
 
     // Attach the product details to the order
     const orderWithProductDetails = {
       ...order,
-      products: productDetails
+      products: productDetails,
     };
 
     res.json(orderWithProductDetails);
@@ -330,23 +356,23 @@ async function changeOrderStatus(req, res) {
 
     // Basic validations
     if (!orderId) {
-      validations.push({ key: 'orderId', message: 'Order Id is required' });
+      validations.push({ key: "orderId", message: "Order Id is required" });
     }
 
     if (!status) {
-      validations.push({ key: 'status', message: 'Status is required' });
+      validations.push({ key: "status", message: "Status is required" });
     }
 
     // Additional validation for status 7 (where OTP is required)
-    if (status == '7' || status == 7) {
+    if (status == "7" || status == 7) {
       if (!otp) {
-        validations.push({ key: 'otp', message: 'OTP is required' });
+        validations.push({ key: "otp", message: "OTP is required" });
       }
     }
 
     // Return early if there are any validation errors
     if (validations.length) {
-      res.status(400).json({ status: 'error', validations: validations });
+      res.status(400).json({ status: "error", validations: validations });
       return;
     }
 
@@ -395,7 +421,9 @@ async function changeOrderStatus(req, res) {
       // Send success response
       res.status(200).json({ status: "success", message: "Status Updated" });
     } else {
-      res.status(400).json({ status: "error", message: "Status update failed" });
+      res
+        .status(400)
+        .json({ status: "error", message: "Status update failed" });
     }
   } catch (error) {
     res
@@ -403,7 +431,6 @@ async function changeOrderStatus(req, res) {
       .json({ message: "Failed to update status", error: error.message });
   }
 }
-
 
 async function getAll(req, res) {
   try {
@@ -437,17 +464,15 @@ async function deleteOrder(id) {
     await client.connect();
     const db = client.db("ImmunePlus");
     const collection = db.collection("ongoingOrders");
-    
+
     const result = await collection.deleteOne({ _id: id });
     if (result.deletedCount > 0) {
-    //   res
-    //     .status(200)
-    //     .json({ message: `order deleted ${id}`, status: "Success" });
-
-
+      //   res
+      //     .status(200)
+      //     .json({ message: `order deleted ${id}`, status: "Success" });
     }
   } catch (error) {
-    console.log(error)
+    console.log(error);
     console.log("An error occurred during deletion");
   } finally {
     //await client.close();
