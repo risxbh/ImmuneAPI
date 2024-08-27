@@ -128,14 +128,14 @@ async function placeOrder(req, res) {
       const otp = Math.floor(1000 + Math.random() * 9000);
       const order = {
         _id: newOrderId,
-        userId,
+        userId: parseInt(userId),
         products: parsedProducts, // Use parsedProducts
         quantity: parsedQuantity, // Add parsedQuantity to the order
         location,
         status: 0,
         date: dateInIST,
         assignedPharmacy: null,
-        totalPrice: totalPrice,
+        totalPrice: parseInt(totalPrice),
         assignedPartner: null,
         prescriptionImg: prescriptionImagePaths,
         otp: otp,
