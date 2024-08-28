@@ -278,7 +278,7 @@ async function assignOrderToPharmacy(orderId, pharmacyId) {
 
     await ordersCollection.updateOne(
       { _id: orderId },
-      { $set: { assignedPharmacy: pharmacyId, status: 1 } }
+      { $set: { assignedPharmacy: pharmacyId, status: 2 } }
     );
     await paymentCollection.updateOne(
       { orderId: orderId },
