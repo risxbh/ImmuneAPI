@@ -745,6 +745,46 @@ async function getSchedulebyId(req, res) {
     }
 }
 
+async function getScheduleByScheduleId(req, res) {
+    const { scheduleId } = req.query;
+
+    if (!scheduleId) {
+        res.status(400).json({ status: 'error', message: 'Schedule ID is required' });
+        return;
+    }
+
+    try {
+        await connectToDatabase();
+        const db = client.db("ImmunePlus");
+        const collection = db.collection("doctoravailabilities");
+
+        const schedule = await collection.findOne({ _id: parseInt(scheduleId) });
+
+        if (!schedule) {
+            res.status(404).json({ status: 'error', message: 'No Data found' });
+            return;
+        }
+
+        const formattedSchedule = {
+            date: new Date(schedule.date).toDateString(), // Format date to a readable string
+            info: {
+                _id: schedule._id,
+                doctorId: schedule.doctorId,
+                date: schedule.date,
+                time: schedule.time,
+                availableSlots: schedule.availableSlots,
+                totalslots: schedule.totalslots,
+                bookedClinic: schedule.bookedClinic,
+                bookedVideo: schedule.bookedVideo
+            }
+        };
+
+        res.json(formattedSchedule);
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to fetch Data', error: error.message });
+    }
+}
+
 async function getAppointmentbyId(req, res) {
     const { id } = req.query;
 
@@ -854,6 +894,7 @@ module.exports = {
     getAllAvailableDocter,
     getDocterbyId,
     bookAppointment,
+    getScheduleByScheduleId,
     createSchedule,
     filterSchedules,
     upload,

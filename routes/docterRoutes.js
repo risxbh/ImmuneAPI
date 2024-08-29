@@ -1,5 +1,5 @@
 const express = require('express');
-const { loginDoctor, registerDoctor, updateDoctor,updateTotalSlots,upload,Dashboard,deleteSchedule, deleteDoctor,getAll,getAllAvailableDocter,getDocterbyId,bookAppointment,createSchedule,filterSchedules,getTopRatedDoctors,getSchedulebyId,getAppointmentbyId, getBookingById } = require('../controllers/doctersController');
+const { loginDoctor, registerDoctor, updateDoctor,updateTotalSlots,upload,Dashboard,deleteSchedule, deleteDoctor,getAll,getAllAvailableDocter,getDocterbyId,bookAppointment,createSchedule,filterSchedules,getTopRatedDoctors,getSchedulebyId,getAppointmentbyId, getBookingById, getScheduleByScheduleId } = require('../controllers/doctersController');
 
 const router = express.Router();
 
@@ -17,6 +17,7 @@ router.post('/schedule', createSchedule);
 router.get('/filterSchedules', filterSchedules);
 router.get('/topRated', getTopRatedDoctors);
 router.get('/scheduleById', getSchedulebyId);
+router.get('/getscheduleById', getScheduleByScheduleId);
 router.get('/appointmentById', getAppointmentbyId);
 router.get('/dashboard', Dashboard);
 router.get('/getBookbyId', getBookingById);
