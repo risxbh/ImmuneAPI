@@ -52,7 +52,7 @@ async function bookAppointment(req, res) {
     try {
         await connectToDatabase();
         await client.connect();
-        const { scheduleId, patientId, type } = req.body;
+        const { scheduleId, patientId, type, appointmentFor, fullName, age, gender, phoneNumber, email, medicalHistory, attachment } = req.body;
         const db = client.db("ImmunePlus");
         const availabilitiesCollection = db.collection("doctoravailabilities");
         const appointmentsCollection = db.collection("appointments");
@@ -61,7 +61,7 @@ async function bookAppointment(req, res) {
         const docterCollection = db.collection("Doctors");
 
         // Validate input
-        if (!scheduleId || !patientId || !type) {
+        if (!scheduleId || !patientId || !type, appointmentFor) {
             res.status(400).json({ status: 'error', message: 'Schedule ID, Type of Appointment and patient name are required' });
             return;
         }
@@ -125,7 +125,9 @@ async function bookAppointment(req, res) {
             date: schedule.date,
             time: schedule.time,
             patientId: patientId,
-            type:type
+            type:type,
+            appointmentFor: appointmentFor,
+            fullName: fullName, age: age, gender: gender, phoneNumber: phoneNumber, email: email, medicalHistory: medicalHistory
         };
 
         const paymentInfo = {
@@ -259,7 +261,7 @@ async function registerDoctor(req, res) {
             });
 
             if (result.acknowledged === true) {
-                return res.status(200).json({ status: 'success', message: 'Doctor registered successfully' });
+                return res.status(200).json({ status: 'success', message: 'Doctor registered successfully', id: newId });
             } else {
                 res.status(400).json({ status: 'error', message: 'Registration failed' });
             }
