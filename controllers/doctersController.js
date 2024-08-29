@@ -336,6 +336,69 @@ async function createSchedule(req, res) {
     // }
     
 }
+
+async function deleteSchedule(req, res) {
+    try {
+        const { id } = req.body;
+        await client.connect()
+        const db = client.db("ImmunePlus");
+        const collection = db.collection("doctoravailabilities");
+
+        const result = await collection.deleteOne({ _id: parseInt(id) });
+        console.log(result);
+        if (result.deletedCount > 0) {
+            res.status(200).json({ status: 'success', message: 'Schedule Deleted' });
+        } else {
+            res.status(400).json({ status: 'error', message: 'Delete failed' });
+        }
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to delete Schedule', error: error });
+    }
+}
+
+async function updateTotalSlots(req, res) {
+    try {
+        await connectToDatabase();
+        await client.connect();
+        const { id, totalslots } = req.body;
+        const db = client.db("ImmunePlus");
+        const collection = db.collection("doctoravailabilities");
+
+        // Validations
+        let validations = [];
+        if (!id) validations.push({ key: 'id', message: 'Schedule ID is required' });
+        if (totalslots === undefined || isNaN(totalslots) || totalslots < 0) validations.push({ key: 'totalslots', message: 'Total slots must be a non-negative number' });
+
+        if (validations.length) {
+            res.status(400).json({ status: 'error', validations: validations });
+            return;
+        }
+
+        // Find the existing schedule by _id
+        const existingSchedule = await collection.findOne({ _id: parseInt(id) });
+
+        if (!existingSchedule) {
+            res.status(404).json({ status: 'error', message: 'Schedule not found for the given ID' });
+            return;
+        }
+
+        // Update the totalslots field
+        const result = await collection.updateOne(
+            { _id: parseInt(id) },
+            { $set: { totalslots: parseInt(totalslots) } }
+        );
+
+        if (result.modifiedCount === 1) {
+            res.status(200).json({ status: 'success', message: 'Total slots updated successfully' });
+        } else {
+            res.status(400).json({ status: 'error', message: 'Update failed' });
+        }
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to update total slots', error: error.message });
+    } finally {
+        //await client.close();
+    }
+}
 async function filterSchedules(req, res) {
     try {
         await connectToDatabase();
@@ -745,5 +808,7 @@ module.exports = {
     getTopRatedDoctors,
     getSchedulebyId,
     getAppointmentbyId,
-    Dashboard
+    Dashboard,
+    updateTotalSlots,
+    deleteSchedule
 };
