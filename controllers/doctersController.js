@@ -887,6 +887,48 @@ async function getSchedulebyId(req, res) {
     await connectToDatabase();
     const db = client.db("ImmunePlus");
     const collection = db.collection("doctoravailabilities");
+    const schedule = await collection
+      .find({ doctorId: parseInt(id) })
+      .toArray();
+
+    if (schedule.length === 0) {
+      res.status(404).json({ status: "error", message: "No Data found" });
+      return;
+    }
+
+    // Group and format the schedule by date
+    const formattedSchedule = schedule.reduce((acc, curr) => {
+      const dateStr = new Date(curr.date).toDateString(); // Format date
+      const existingDate = acc.find((item) => item.date === dateStr);
+
+      if (existingDate) {
+        existingDate.info.push(curr);
+      } else {
+        acc.push({ date: dateStr, info: [curr] });
+      }
+
+      return acc;
+    }, []);
+
+    res.json(formattedSchedule);
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Failed to fetch Data", error: error.message });
+  }
+}
+
+async function getSchedulebyIdDetails(req, res) {
+  const { id } = req.query;
+
+  if (!id) {
+    res.status(400).json({ status: "error", message: "Docter ID is required" });
+    return;
+  }
+  try {
+    await connectToDatabase();
+    const db = client.db("ImmunePlus");
+    const collection = db.collection("doctoravailabilities");
     const docCollection = db.collection("Doctors");
 
     const schedule = await collection.find({ _id: parseInt(id) }).toArray();
@@ -1055,4 +1097,5 @@ module.exports = {
   Dashboard,
   updateTotalSlots,
   deleteSchedule,
+  getSchedulebyIdDetails,
 };
