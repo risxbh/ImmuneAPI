@@ -159,7 +159,7 @@ async function loginUser(req, res) {
         phoneNumMessage = 'Phone Number is required.';
     }
     if (phoneNumMessage) {
-        validations.push({ key: 'Phone Number', message: phoneNumMessage });
+        validations.push({ key: 'PhoneNumber', message: phoneNumMessage });
     }
 
 
