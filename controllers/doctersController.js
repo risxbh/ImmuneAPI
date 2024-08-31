@@ -75,13 +75,11 @@ async function bookAppointment(req, res) {
 
     // Validate input
     if ((!scheduleId || !patientId || !type, appointmentFor)) {
-      res
-        .status(400)
-        .json({
-          status: "error",
-          message:
-            "Schedule ID, Type of Appointment and patient name are required",
-        });
+      res.status(400).json({
+        status: "error",
+        message:
+          "Schedule ID, Type of Appointment and patient name are required",
+      });
       return;
     }
 
@@ -94,23 +92,19 @@ async function bookAppointment(req, res) {
     });
 
     if (!schedule) {
-      res
-        .status(404)
-        .json({
-          status: "error",
-          message: "No schedule found for the given ID",
-        });
+      res.status(404).json({
+        status: "error",
+        message: "No schedule found for the given ID",
+      });
       return;
     }
 
     // Check if there are available slots
     if (schedule.availableSlots <= 0) {
-      res
-        .status(400)
-        .json({
-          status: "error",
-          message: "No available slots for the given time",
-        });
+      res.status(400).json({
+        status: "error",
+        message: "No available slots for the given time",
+      });
       return;
     }
 
@@ -187,13 +181,11 @@ async function bookAppointment(req, res) {
     sendUserNotification(patientId, newId, 10);
 
     if (result.acknowledged === true && result2.acknowledged == true) {
-      res
-        .status(200)
-        .json({
-          status: "success",
-          message: "Appointment booked successfully",
-          bookingId: newId,
-        });
+      res.status(200).json({
+        status: "success",
+        message: "Appointment booked successfully",
+        bookingId: newId,
+      });
     } else {
       res
         .status(400)
@@ -367,13 +359,11 @@ async function registerDoctor(req, res) {
       });
 
       if (result.acknowledged === true) {
-        return res
-          .status(200)
-          .json({
-            status: "success",
-            message: "Doctor registered successfully",
-            id: newId,
-          });
+        return res.status(200).json({
+          status: "success",
+          message: "Doctor registered successfully",
+          id: newId,
+        });
       } else {
         res
           .status(400)
@@ -381,13 +371,11 @@ async function registerDoctor(req, res) {
       }
     }
   } catch (error) {
-    res
-      .status(500)
-      .json({
-        status: "error",
-        message: "An error occurred during registration",
-        reason: error.message,
-      });
+    res.status(500).json({
+      status: "error",
+      message: "An error occurred during registration",
+      reason: error.message,
+    });
   } finally {
     //await client.close();
   }
@@ -530,12 +518,10 @@ async function updateTotalSlots(req, res) {
     const existingSchedule = await collection.findOne({ _id: parseInt(id) });
 
     if (!existingSchedule) {
-      res
-        .status(404)
-        .json({
-          status: "error",
-          message: "Schedule not found for the given ID",
-        });
+      res.status(404).json({
+        status: "error",
+        message: "Schedule not found for the given ID",
+      });
       return;
     }
 
@@ -546,12 +532,10 @@ async function updateTotalSlots(req, res) {
     );
 
     if (result.modifiedCount === 1) {
-      res
-        .status(200)
-        .json({
-          status: "success",
-          message: "Total slots updated successfully",
-        });
+      res.status(200).json({
+        status: "success",
+        message: "Total slots updated successfully",
+      });
     } else {
       res.status(400).json({ status: "error", message: "Update failed" });
     }
@@ -780,13 +764,11 @@ async function updateDoctor(req, res) {
           .json({ status: "error", message: "Failed to update Doctor" });
       }
     } catch (error) {
-      res
-        .status(500)
-        .json({
-          status: "error",
-          message: "An error occurred during update",
-          reason: error,
-        });
+      res.status(500).json({
+        status: "error",
+        message: "An error occurred during update",
+        reason: error,
+      });
     } finally {
       //await client.close();
     }
@@ -831,13 +813,11 @@ async function deleteDoctor(req, res) {
         .json({ status: "error", message: "Failed to delete user" });
     }
   } catch (error) {
-    res
-      .status(500)
-      .json({
-        status: "error",
-        message: "An error occurred during deletion",
-        reason: error,
-      });
+    res.status(500).json({
+      status: "error",
+      message: "An error occurred during deletion",
+      reason: error,
+    });
   } finally {
     //await client.close();
   }
@@ -907,14 +887,18 @@ async function getSchedulebyId(req, res) {
     await connectToDatabase();
     const db = client.db("ImmunePlus");
     const collection = db.collection("doctoravailabilities");
-    const schedule = await collection
-      .find({ doctorId: parseInt(id) })
-      .toArray();
+    const docCollection = db.collection("Doctors");
+
+    const schedule = await collection.find({ _id: parseInt(id) }).toArray();
 
     if (schedule.length === 0) {
       res.status(404).json({ status: "error", message: "No Data found" });
       return;
     }
+    console.log(schedule[0].doctorId);
+    const doctors = await docCollection
+      .find({ _id: parseInt(schedule[0].doctorId) })
+      .toArray();
 
     // Group and format the schedule by date
     const formattedSchedule = schedule.reduce((acc, curr) => {
@@ -924,7 +908,7 @@ async function getSchedulebyId(req, res) {
       if (existingDate) {
         existingDate.info.push(curr);
       } else {
-        acc.push({ date: dateStr, info: [curr] });
+        acc.push({ date: dateStr, info: [curr], doctorInfo: doctors });
       }
 
       return acc;
@@ -994,12 +978,10 @@ async function getTopRatedDoctors(req, res) {
 
     res.json(doctors);
   } catch (error) {
-    res
-      .status(500)
-      .json({
-        message: "Failed to fetch top-rated doctors",
-        error: error.message,
-      });
+    res.status(500).json({
+      message: "Failed to fetch top-rated doctors",
+      error: error.message,
+    });
   }
 }
 

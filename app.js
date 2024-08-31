@@ -26,7 +26,7 @@ const userNotification = require("./routes/notificationRoutes/userNotificationRo
 const pharmaNotification = require("./routes/notificationRoutes/pharmaNotificationRoutes");
 const docterNotification = require("./routes/notificationRoutes/docterNotificationRoutes");
 const posterRoutes = require("./routes/posterRoutes");
-const adminRoutes = require("./routes/admin")
+const adminRoutes = require("./routes/admin");
 
 const app = express();
 const server = http.createServer(app);
@@ -36,7 +36,7 @@ const io = socketIo(server, {
     methods: ["GET", "POST"],
   },
 });
-const port = 5000;
+const port = 6000;
 
 // Configure CORS to allow requests from specific origins
 const corsOptions = {
