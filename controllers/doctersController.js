@@ -85,8 +85,10 @@ async function bookAppointment(req, res) {
 
     // Find the schedule by its ID
     const schedule = await availabilitiesCollection.findOne({
-      _id: scheduleId,
+      _id: parseInt(scheduleId),
     });
+    // docId = schedule.doctorId;
+    console.log(schedule);
     const docter = await docterCollection.findOne({
       _id: schedule.doctorId,
     });
@@ -128,6 +130,7 @@ async function bookAppointment(req, res) {
       { upsert: true, returnDocument: "after" }
     );
     const newId = counter.seq;
+    console.log(newId);
     const counter2 = await countersCollection.findOneAndUpdate(
       { _id: "paymentId" },
       { $inc: { seq: 1 } },
@@ -156,7 +159,6 @@ async function bookAppointment(req, res) {
       age: age,
       gender: gender,
       phoneNumber: phoneNumber,
-      email: email,
       medicalHistory: medicalHistory,
     };
 
@@ -177,15 +179,14 @@ async function bookAppointment(req, res) {
     const result = await appointmentsCollection.insertOne(appointment);
     const result2 = await paymentCollection.insertOne(paymentInfo);
 
-    sendDoctorNotification(schedule.doctorId, newId, 10);
-    sendUserNotification(patientId, newId, 10);
-
     if (result.acknowledged === true && result2.acknowledged == true) {
       res.status(200).json({
         status: "success",
         message: "Appointment booked successfully",
         bookingId: newId,
       });
+      sendDoctorNotification(schedule.doctorId, newId, 10);
+      sendUserNotification(patientId, newId, 10);
     } else {
       res
         .status(400)
