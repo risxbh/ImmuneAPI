@@ -18,13 +18,19 @@ const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
 async function registerUser(req, res) {
-    const { name, password, address, phoneNumber, licenseNo, email, accountHolderName, accountNumber, ifscCode,bankName } = req.body;
+    const { name, password, address, phoneNumber, licenseNo, location, email, accountHolderName, accountNumber, ifscCode, bankName } = req.body;
     let validations = [];
     let regex = /^(?=.*[0-9])(?=.*[!@#$%^&*])(?=.*[A-Z])(?=.*[a-z])/;
     let emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    
+
     let passwordMessage = '';
     let phoneNumMessage = '';
+    let locationMessage = '';
+
+    let parsedLocation = [];
+    if (location) {
+        parsedLocation = location.split(',').map(coord => parseFloat(coord));
+    }
 
     if (phoneNumber) {
         if (phoneNumber.length !== 10) {
@@ -52,6 +58,18 @@ async function registerUser(req, res) {
 
     if (passwordMessage) {
         validations.push({ key: 'password', message: passwordMessage });
+    }
+
+    if (parsedLocation.length !== 2) {
+        locationMessage = 'Location should be an array containing latitude and longitude.';
+    } else {
+        const [latitude, longitude] = parsedLocation;
+        if (isNaN(latitude) || isNaN(longitude)) {
+            locationMessage = 'Latitude and longitude should be valid numbers.';
+        }
+    }
+    if (locationMessage) {
+        validations.push({ key: 'location', message: locationMessage });
     }
 
     if (!address) validations.push({ key: 'address', message: 'Address is required' });
@@ -106,13 +124,14 @@ async function registerUser(req, res) {
                 phoneNumber,
                 licenseNo,
                 bankName,
+                location:parsedLocation,
                 licenseImg: filePath,
                 accountHolderName,
                 accountNumber,
                 ifscCode,
                 isApproved: 0
             });
-           
+
             if (result.acknowledged === true) {
                 return res.status(200).json({ status: 'success', message: 'Pharmacy registered successfully' });
             } else {
@@ -125,6 +144,7 @@ async function registerUser(req, res) {
         // await client.close();
     }
 }
+
 async function loginUser(req, res) {
     const { phoneNumber, password } = req.body;
     let validations = [];
@@ -157,23 +177,23 @@ async function loginUser(req, res) {
         if (user) {
             const result = await bcrypt.compare(password, user.password);
             if (result) {
-                if(user.isApproved ==1){
-                const userInfo = {
-                    name: user.name,
-                    id: user._id,
-                    address: user.address,
-                    licenseNo: user.licenseNo,
-                    phoneNumber: user.phoneNumber,
-                    previousHistory: user.previousHistory,
-                    licenseImg: user.licenseImg
-                };
+                if (user.isApproved == 1) {
+                    const userInfo = {
+                        name: user.name,
+                        id: user._id,
+                        address: user.address,
+                        licenseNo: user.licenseNo,
+                        phoneNumber: user.phoneNumber,
+                        previousHistory: user.previousHistory,
+                        licenseImg: user.licenseImg
+                    };
 
-                res.json({ status: 'success', message: 'Login successfull!', user: userInfo });
-            }else if(user.isApproved == 2){
-                res.json({ status: 'decline', message: 'Your Profile is been Declined' });
-            }else {
-                res.json({ status: 'pending', message: 'Your Profile is not been approved' });
-            }
+                    res.json({ status: 'success', message: 'Login successfull!', user: userInfo });
+                } else if (user.isApproved == 2) {
+                    res.json({ status: 'decline', message: 'Your Profile is been Declined' });
+                } else {
+                    res.json({ status: 'pending', message: 'Your Profile is not been approved' });
+                }
             } else {
                 res.status(400).json({ status: 'error', message: 'Invalid Phone Number or password' });
             }
@@ -277,7 +297,7 @@ async function deleteUser(req, res) {
             return;
         }
 
-        const result = await collection.deleteOne({  _id: id });
+        const result = await collection.deleteOne({ _id: id });
 
         if (result.deletedCount > 0) {
             res.status(200).json({ status: 'success', message: 'User deleted successfully' });
@@ -295,7 +315,7 @@ async function getAll(req, res) {
     try {
         const db = client.db("ImmunePlus");
         const collection = db.collection("Pharmacy");
-        
+
         const users = await collection.find().toArray();
         res.json(users);
     } catch (error) {
@@ -332,7 +352,7 @@ async function Dashboard(req, res) {
                 acc.todayOrder += 1;
 
             }
-        
+
             if (Array.isArray(order.products)) {
                 acc.money += order.products.reduce((total, item) => total + item.price, 0);
             }
@@ -362,7 +382,7 @@ async function getOngoingOrder(req, res) {
         const db = client.db("ImmunePlus");
         const collection = db.collection("Orders");
 
-        const orders = await collection.find({ 
+        const orders = await collection.find({
             status: { $gte: 1, $lte: 4 },
             assignedPharmacy: parseInt(id)
         }).toArray();
