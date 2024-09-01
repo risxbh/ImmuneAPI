@@ -3,7 +3,6 @@ const fs = require('fs');
 const path = require('path');
 const { MongoClient, ServerApiVersion } = require('mongodb');
 const url = 'mongodb+srv://rsrisabhsingh212:Immuneplus123@immuneplus.v6jufn0.mongodb.net/?retryWrites=true&w=majority&appName=ImmunePlus';
-const Product = require('../models/Product');
 
 const client = new MongoClient(url, {
     serverApi: {
@@ -20,15 +19,11 @@ const upload = multer({ storage });
 async function create(req, res) {
     try {
         const {
-            img, name, manufacturers, salt_composition, introduction, benefits, description,
-            how_to_use, safety_advise, if_miss, Packaging, Package, Quantity, Product_Form, 
-            MRP, prescription_required, common_side_effect, use_of, alcoholInteraction, 
-            pregnancyInteraction, lactationInteraction, drivingInteraction, kidneyInteraction, 
-            liverInteraction
+            img, name, manufacturers, category, sub_category, Packaging, Package, Quantity, Product_Form, MRP, prescription_required, primary_use, description, salt_synonmys, storage, introduction, use_of, benefits, side_effect, how_to_use, how_works, safety_advise, if_miss, ingredients, country_of_origin
         } = req.body;
 
         const db = client.db("ImmunePlus");
-        const collection = db.collection("Products");
+        const collection = db.collection("OTC");
         const countersCollection = db.collection("Counters");
 
         let existing = await collection.findOne({ name });
@@ -51,7 +46,7 @@ async function create(req, res) {
                 img: img || 'default_image_path_or_value',
                 name,
                 manufacturers,
-                salt_composition,
+                salt_synonmys, // Ensure this variable is properly defined in req.body
                 introduction,
                 benefits,
                 description,
@@ -64,14 +59,13 @@ async function create(req, res) {
                 Product_Form,
                 MRP: parseFloat(MRP) || 0,
                 prescription_required: parsedPrescription,
-                common_side_effect,
+                primary_use,
+                storage,
                 use_of,
-                alcoholInteraction,
-                pregnancyInteraction,
-                lactationInteraction,
-                drivingInteraction,
-                kidneyInteraction,
-                liverInteraction
+                side_effect,
+                how_works,
+                ingredients,
+                country_of_origin
             });
 
             if (result.acknowledged) {
@@ -90,7 +84,7 @@ async function getAllProducts(req, res) {
     try {
         await client.connect();
         const db = client.db("ImmunePlus");
-        const collection = db.collection("Products");
+        const collection = db.collection("OTC");
 
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 100;
@@ -128,7 +122,7 @@ async function update(req, res) {
 
         const { id, name, description, price, pieces, dose, category } = req.body;
         const db = client.db("ImmunePlus");
-        const collection = db.collection("Products");
+        const collection = db.collection("OTC");
 
         let existing = await collection.findOne({ name });
 
@@ -157,9 +151,9 @@ async function update(req, res) {
         }
 
         if (req.file && req.file.buffer) {
-            const filePath = path.join('uploads/product', `${id}`);
-            if (!fs.existsSync('uploads/product')) {
-                fs.mkdirSync('uploads/product', { recursive: true });
+            const filePath = path.join('uploads/otc', `${id}`);
+            if (!fs.existsSync('uploads/otc')) {
+                fs.mkdirSync('uploads/otc', { recursive: true });
             }
             fs.writeFileSync(filePath, req.file.buffer);
             updateFields.img = filePath;
@@ -188,7 +182,7 @@ async function remove(req, res) {
         const { id } = req.body;
         await client.connect()
         const db = client.db("ImmunePlus");
-        const collection = db.collection("Products");
+        const collection = db.collection("OTC");
 
         const user = await collection.findOne({ _id: parseInt(id) });
         console.log(user);
@@ -214,8 +208,8 @@ async function getProductById(req, res) {
     try {
         await client.connect();
         const db = client.db("ImmunePlus");
-        const collection = db.collection("Products");
-        const product = await collection.find({_id: parseInt(id) }).toArray();
+        const collection = db.collection("OTC");
+        const product = await collection.find({ _id: parseInt(id) }).toArray();
         if (product.length === 0) {
             res.status(404).json({ status: 'error', message: 'Product not found' });
         } else {
@@ -234,111 +228,3 @@ module.exports = {
     remove,
     getProductById
 };
-
-// async function create(req, res) {
-//     try {
-//         await client.connect();
-//         const { name, description, price, pieces, dose, category, prescription } = req.body;
-//         const db = client.db("ImmunePlus");
-//         const collection = db.collection("Products");
-//         const countersCollection = db.collection("Counters");
-
-//         let validations = [];
-
-//         if (!description) validations.push({ key: 'description', message: 'Description is required' });
-//         if (!name) validations.push({ key: 'name', message: 'Name is required' });
-//         if (!price) validations.push({ key: 'price', message: 'Price is required' });
-//         if (!pieces) validations.push({ key: 'pieces', message: 'Pieces is required' });
-//         if (!dose) validations.push({ key: 'dose', message: 'Dose is required' });
-//         if (!category) validations.push({ key: 'category', message: 'At least 1 Category is required' });
-//         if (!prescription) validations.push({ key: 'prescription', message: 'Please tell prescription true or false' });
-//         if (!req.file || !req.file.buffer) validations.push({ key: 'img', message: 'Image is required' });
-
-//         if (validations.length) {
-//             return res.status(400).json({ status: 'error', validations: validations });
-//         }
-
-//         let existing = await collection.findOne({ name });
-
-//         if (existing) {
-//             return res.status(400).json({ status: 'error', message: 'Product already exists' });
-//         } else {
-//             const counter = await countersCollection.findOneAndUpdate(
-//                 { _id: "productId" },
-//                 { $inc: { seq: 1 } },
-//                 { upsert: true, returnDocument: 'after' }
-//             );
-//             const newId = counter.seq;
-//             const filePath = path.join('uploads/product', `${newId}`);
-//             if (!fs.existsSync('uploads/product')) {
-//                 fs.mkdirSync('uploads/product', { recursive: true });
-//             }
-//             fs.writeFileSync(filePath, req.file.buffer);
-
-//             // Ensure pieces and dose are strings before attempting to split them
-//             let piecesArray, doseArray, categoryArray;
-
-//             if (typeof pieces === 'string') {
-//                 piecesArray = pieces.split(',').map(item => parseFloat(item.trim()));
-//             } else if (Array.isArray(pieces)) {
-//                 piecesArray = pieces.map(item => parseFloat(item));
-//             } else {
-//                 piecesArray = [];
-//             }
-
-//             if (typeof dose === 'string') {
-//                 doseArray = dose.split(',').map(item => parseFloat(item.trim()));
-//             } else if (Array.isArray(dose)) {
-//                 doseArray = dose.map(item => parseFloat(item));
-//             } else {
-//                 doseArray = [];
-//             }
-
-//             if (typeof category === 'string') {
-//                 categoryArray = category.split(',').map(item => parseFloat(item.trim()));
-//             } else if (Array.isArray(category)) {
-//                 categoryArray = category.map(item => parseFloat(item));
-//             } else {
-//                 categoryArray = [];
-//             }
-
-//             if (!Array.isArray(piecesArray) || piecesArray.length === 0) {
-//                 return res.status(400).json({ status: 'error', message: 'Pieces should be a non-empty array' });
-//             }
-
-//             if (!Array.isArray(doseArray) || doseArray.length === 0) {
-//                 return res.status(400).json({ status: 'error', message: 'Dose should be a non-empty array' });
-//             }
-
-            
-//             if (!Array.isArray(categoryArray) || categoryArray.length === 0) {
-//                 return res.status(400).json({ status: 'error', message: 'Dose should be a non-empty array' });
-//             }
-
-//             // Get and increment the counter for TypeOfTreatment
-
-
-//             const result = await collection.insertOne({
-//                 _id: newId,
-//                 name,
-//                 description,
-//                 img: filePath,
-//                 price,
-//                 pieces: piecesArray,
-//                 dose: doseArray,
-//                 category: categoryArray,
-//                 prescription: JSON.parse(prescription)
-//             });
-
-//             if (result.acknowledged === true) {
-//                 return res.status(200).json({ status: 'success', message: 'Product Saved' });
-//             } else {
-//                 return res.status(400).json({ status: 'error', message: 'Creation failed' });
-//             }
-//         }
-//     } catch (error) {
-//         res.status(500).json({ message: 'Failed to create product', error: error.message });
-//     } finally {
-//         //await client.close();
-//     }
-// }

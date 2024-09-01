@@ -201,6 +201,34 @@ async function bookAppointment(req, res) {
   }
 }
 
+async function getBookingById(req, res) {
+    try {
+        await connectToDatabase();
+        await client.connect();
+        const { id } = req.query;
+        const db = client.db("ImmunePlus");
+        const appointmentsCollection = db.collection("appointments");
+
+        if (!id) {
+            res.status(400).json({ status: 'error', message: 'Booking ID is required' });
+            return;
+        }
+
+        const appointment = await appointmentsCollection.findOne({ _id: parseInt(id, 10) });
+
+        if (!appointment) {
+            res.status(404).json({ status: 'error', message: 'No appointment found for the given ID' });
+            return;
+        }
+
+        res.status(200).json({ status: 'success', appointment });
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to retrieve appointment', error: error.message });
+    } finally {
+        // await client.close();
+    }
+}
+
 module.exports = bookAppointment;
 
 async function registerDoctor(req, res) {
@@ -421,18 +449,49 @@ async function createSchedule(req, res) {
           "Working hours and available slots arrays must have the same length",
       });
 
-    if (validations.length) {
-      res.status(400).json({ status: "error", validations: validations });
-      return;
-    }
-    const incrementAmount = workingHours.length;
-    const counter = await countersCollection.findOneAndUpdate(
-      { _id: "scheduleId" },
-      { $inc: { seq: incrementAmount } },
-      { upsert: true, returnDocument: "after" }
-    );
-    const newId = counter.seq;
-    const baseId = counter.seq - incrementAmount + 1;
+        if (validations.length) {
+            res.status(400).json({ status: 'error', validations: validations });
+            return;
+        }
+
+        // Check for existing schedules with the same date, time, and doctorId
+        const existingSchedules = await collection.find({
+            doctorId,
+            date: new Date(date),
+            time: { $in: workingHours }
+        }).toArray();
+
+        // Prepare the new schedule records
+        const scheduleRecords = workingHours.map((time, index) => ({
+            doctorId,
+            date: new Date(date),
+            time,
+            availableSlots: availableSlots[index],
+            totalslots: availableSlots[index],
+            bookedClinic: 0,
+            bookedVideo: 0,
+        }));
+
+        if (existingSchedules.length > 0) {
+            // Update existing schedules
+            for (const record of scheduleRecords) {
+                await collection.updateOne(
+                    { doctorId, date: record.date, time: record.time },
+                    { $set: { availableSlots: record.availableSlots, totalslots: record.totalslots } },
+                    { upsert: true }
+                );
+            }
+            res.status(200).json({ status: 'success', message: 'Schedules updated successfully' });
+        } else {
+            // Insert new schedule records
+            const incrementAmount = workingHours.length;
+            const counter = await countersCollection.findOneAndUpdate(
+                { _id: "scheduleId" },
+                { $inc: { seq: incrementAmount } },
+                { upsert: true, returnDocument: 'after' }
+            );
+            const newId = counter.seq;
+            const baseId = counter.seq - incrementAmount + 1;
 
     // Create schedule records
     const scheduleRecords = workingHours.map((time, index) => ({
@@ -965,6 +1024,46 @@ async function getSchedulebyIdDetails(req, res) {
   }
 }
 
+async function getScheduleByScheduleId(req, res) {
+    const { scheduleId } = req.query;
+
+    if (!scheduleId) {
+        res.status(400).json({ status: 'error', message: 'Schedule ID is required' });
+        return;
+    }
+
+    try {
+        await connectToDatabase();
+        const db = client.db("ImmunePlus");
+        const collection = db.collection("doctoravailabilities");
+
+        const schedule = await collection.findOne({ _id: parseInt(scheduleId) });
+
+        if (!schedule) {
+            res.status(404).json({ status: 'error', message: 'No Data found' });
+            return;
+        }
+
+        const formattedSchedule = {
+            date: new Date(schedule.date).toDateString(), // Format date to a readable string
+            info: {
+                _id: schedule._id,
+                doctorId: schedule.doctorId,
+                date: schedule.date,
+                time: schedule.time,
+                availableSlots: schedule.availableSlots,
+                totalslots: schedule.totalslots,
+                bookedClinic: schedule.bookedClinic,
+                bookedVideo: schedule.bookedVideo
+            }
+        };
+
+        res.json(formattedSchedule);
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to fetch Data', error: error.message });
+    }
+}
+
 async function getAppointmentbyId(req, res) {
   const { id } = req.query;
 
@@ -1089,6 +1188,7 @@ module.exports = {
   getAllAvailableDocter,
   getDocterbyId,
   bookAppointment,
+    getScheduleByScheduleId,
   createSchedule,
   filterSchedules,
   upload,
@@ -1098,5 +1198,6 @@ module.exports = {
   Dashboard,
   updateTotalSlots,
   deleteSchedule,
+    getBookingById,
   getSchedulebyIdDetails,
 };

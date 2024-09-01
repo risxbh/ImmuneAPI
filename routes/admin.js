@@ -8,7 +8,7 @@ const {
 const router = express.Router();
 
 router.post('/changeDocterStatus', changeDocter);
-router.get('/changePharmaStatus', changePharmacy);
+router.post('/changePharmaStatus', changePharmacy);
 router.post('/changeDelParStatus', changeDeliveryPartner);
 router.post('/login', login);
 router.get('/getPending', getPendingRequests);

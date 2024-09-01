@@ -583,6 +583,7 @@ async function assignOrderToPartner(req, res) {
     await client.close();
   }
 }
+
 async function getUserbyId(req, res) {
   const { id } = req.query;
 
@@ -692,6 +693,42 @@ async function Dashboard(req, res) {
   }
 }
 
+async function getOrderHistoryById(req, res) {
+  const { id } = req.query;
+
+  if (!id) {
+    res
+      .status(400)
+      .json({ status: "error", message: "Delivery Partner ID is required" });
+    return;
+  }
+
+  try {
+    await client.connect();
+    const db = client.db("ImmunePlus");
+    const ordersCollection = db.collection("Orders");
+    
+    // Find orders assigned to the delivery partner
+    const orders = await ordersCollection.find({ assignedPartner: parseInt(id) }).toArray();
+
+    if (orders.length === 0) {
+      res
+        .status(404)
+        .json({ status: "error", message: "No orders found for this Delivery Partner" });
+    } else {
+      res.json({ status: "success", orders });
+    }
+  } catch (error) {
+    res.status(500).json({
+      status: "error",
+      message: "An error occurred while fetching order history",
+      reason: error.message,
+    });
+  } finally {
+    //await client.close();
+  }
+}
+
 module.exports = {
   registerDelivery,
   loginDelivery,
@@ -702,5 +739,6 @@ module.exports = {
   getAvailableOrders,
   getUserbyId,
   Dashboard,
+  getOrderHistoryById,
   upload,
 };
