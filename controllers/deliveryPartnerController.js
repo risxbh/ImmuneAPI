@@ -255,7 +255,6 @@ async function loginDelivery(req, res) {
           const user = await collection.findOne({ phoneNumber });
 
           if (user) {
-            const result = await bcrypt.compare(password, user.password);
             if (result) {
               if (user.isApproved == 1) {
                 const userInfo = {
