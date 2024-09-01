@@ -210,20 +210,30 @@ async function getBookingById(req, res) {
     const appointmentsCollection = db.collection("appointments");
 
     if (!id) {
-      res.status(400).json({ status: 'error', message: 'Booking ID is required' });
+      res
+        .status(400)
+        .json({ status: "error", message: "Booking ID is required" });
       return;
     }
 
-    const appointment = await appointmentsCollection.findOne({ _id: parseInt(id, 10) });
+    const appointment = await appointmentsCollection.findOne({
+      _id: parseInt(id, 10),
+    });
 
     if (!appointment) {
-      res.status(404).json({ status: 'error', message: 'No appointment found for the given ID' });
+      res.status(404).json({
+        status: "error",
+        message: "No appointment found for the given ID",
+      });
       return;
     }
 
-    res.status(200).json({ status: 'success', appointment });
+    res.status(200).json({ status: "success", appointment });
   } catch (error) {
-    res.status(500).json({ message: 'Failed to retrieve appointment', error: error.message });
+    res.status(500).json({
+      message: "Failed to retrieve appointment",
+      error: error.message,
+    });
   } finally {
     // await client.close();
   }
@@ -450,16 +460,18 @@ async function createSchedule(req, res) {
       });
 
     if (validations.length) {
-      res.status(400).json({ status: 'error', validations: validations });
+      res.status(400).json({ status: "error", validations: validations });
       return;
     }
 
     // Check for existing schedules with the same date, time, and doctorId
-    const existingSchedules = await collection.find({
-      doctorId,
-      date: new Date(date),
-      time: { $in: workingHours }
-    }).toArray();
+    const existingSchedules = await collection
+      .find({
+        doctorId,
+        date: new Date(date),
+        time: { $in: workingHours },
+      })
+      .toArray();
 
     // Prepare the new schedule records
     const scheduleRecords = workingHours.map((time, index) => ({
@@ -477,18 +489,25 @@ async function createSchedule(req, res) {
       for (const record of scheduleRecords) {
         await collection.updateOne(
           { doctorId, date: record.date, time: record.time },
-          { $set: { availableSlots: record.availableSlots, totalslots: record.totalslots } },
+          {
+            $set: {
+              availableSlots: record.availableSlots,
+              totalslots: record.totalslots,
+            },
+          },
           { upsert: true }
         );
       }
-      res.status(200).json({ status: 'success', message: 'Schedules updated successfully' });
+      res
+        .status(200)
+        .json({ status: "success", message: "Schedules updated successfully" });
     } else {
       // Insert new schedule records
       const incrementAmount = workingHours.length;
       const counter = await countersCollection.findOneAndUpdate(
         { _id: "scheduleId" },
         { $inc: { seq: incrementAmount } },
-        { upsert: true, returnDocument: 'after' }
+        { upsert: true, returnDocument: "after" }
       );
       const newId = counter.seq;
       const baseId = counter.seq - incrementAmount + 1;
@@ -509,9 +528,10 @@ async function createSchedule(req, res) {
       const result = await collection.insertMany(scheduleRecords);
 
       if (result.acknowledged === true) {
-        res
-          .status(200)
-          .json({ status: "success", message: "Schedule created successfully" });
+        res.status(200).json({
+          status: "success",
+          message: "Schedule created successfully",
+        });
       } else {
         res.status(400).json({ status: "error", message: "Creation failed" });
       }
@@ -1029,7 +1049,9 @@ async function getScheduleByScheduleId(req, res) {
   const { scheduleId } = req.query;
 
   if (!scheduleId) {
-    res.status(400).json({ status: 'error', message: 'Schedule ID is required' });
+    res
+      .status(400)
+      .json({ status: "error", message: "Schedule ID is required" });
     return;
   }
 
@@ -1041,7 +1063,7 @@ async function getScheduleByScheduleId(req, res) {
     const schedule = await collection.findOne({ _id: parseInt(scheduleId) });
 
     if (!schedule) {
-      res.status(404).json({ status: 'error', message: 'No Data found' });
+      res.status(404).json({ status: "error", message: "No Data found" });
       return;
     }
 
@@ -1055,13 +1077,15 @@ async function getScheduleByScheduleId(req, res) {
         availableSlots: schedule.availableSlots,
         totalslots: schedule.totalslots,
         bookedClinic: schedule.bookedClinic,
-        bookedVideo: schedule.bookedVideo
-      }
+        bookedVideo: schedule.bookedVideo,
+      },
     };
 
     res.json(formattedSchedule);
   } catch (error) {
-    res.status(500).json({ message: 'Failed to fetch Data', error: error.message });
+    res
+      .status(500)
+      .json({ message: "Failed to fetch Data", error: error.message });
   }
 }
 
@@ -1180,6 +1204,80 @@ async function Dashboard(req, res) {
   }
 }
 
+async function searchDoctors(req, res) {
+  try {
+    await client.connect();
+    const db = client.db("ImmunePlus");
+    const collection = db.collection("Doctors");
+
+    // Extract the keyword from the request body
+    const { keyword } = req.body;
+
+    if (!keyword) {
+      return res.status(400).json({
+        status: "error",
+        message: "Keyword is required for search",
+      });
+    }
+
+    // Define type mapping with partial matching
+    const typeMapping = {
+      homeopathy: 1,
+      allopathy: 2,
+      ayurveda: 3,
+    };
+
+    // Find if the keyword matches or is a part of any specific types
+    let matchedType = null;
+    for (const key in typeMapping) {
+      if (key.includes(keyword.toLowerCase())) {
+        matchedType = typeMapping[key];
+        break;
+      }
+    }
+
+    // Build the search query
+    const searchQuery = {
+      $or: [
+        { name: { $regex: keyword, $options: "i" } },
+        { hospital: { $regex: keyword, $options: "i" } },
+        { specialist: { $regex: keyword, $options: "i" } },
+        { location: { $regex: keyword, $options: "i" } },
+        { experience: { $regex: keyword, $options: "i" } },
+        { rating: { $regex: keyword, $options: "i" } },
+      ],
+    };
+
+    // If a type match was found, add it to the search query
+    if (matchedType !== null) {
+      searchQuery.$or.push({ type: matchedType });
+    }
+
+    // Execute the search
+    const doctors = await collection.find(searchQuery).toArray();
+
+    if (doctors.length > 0) {
+      res.status(200).json({
+        status: "success",
+        data: doctors,
+      });
+    } else {
+      res.status(404).json({
+        status: "error",
+        message: "No doctors found matching the keyword",
+      });
+    }
+  } catch (error) {
+    res.status(500).json({
+      status: "error",
+      message: "An error occurred during the search",
+      reason: error.message,
+    });
+  } finally {
+    //await client.close();
+  }
+}
+
 module.exports = {
   loginDoctor,
   registerDoctor,
@@ -1201,4 +1299,5 @@ module.exports = {
   deleteSchedule,
   getBookingById,
   getSchedulebyIdDetails,
+  searchDoctors,
 };
