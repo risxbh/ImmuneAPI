@@ -15,6 +15,34 @@ let client = new MongoClient(url, {
     useUnifiedTopology: true,
   },
 });
+const fast2sms = require("fast-two-sms");
+
+const OTP_EXPIRY_TIME = 5 * 60 * 1000;
+let otpStorage = {};
+const crypto = require("crypto");
+async function sendOTP(phoneNumber, otp) {
+  const apiKey =
+    "30YlkFZVrtRHCnOIs7PDUajxwEB4evX1SfmW8cMQiGJhLTpbz6FaB3tfYDXniMQNkThgoylJPA8VH15E";
+
+  try {
+    const options = {
+      authorization: apiKey,
+      message: `Your OTP is ${otp}. It is valid for 5 minutes.`,
+      numbers: [phoneNumber],
+      sender_id: "IMMPLUS",
+    };
+    await fast2sms
+      .sendMessage(options)
+      .then((res) => {
+        console.log(res);
+      })
+      .catch((err) => {
+        console.log(err);
+      });
+  } catch (error) {
+    console.error("Error sending OTP:", error.message);
+  }
+}
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
@@ -197,21 +225,18 @@ async function registerDelivery(req, res) {
 }
 
 async function loginDelivery(req, res) {
-  const { phoneNumber, password } = req.body;
+  const { phoneNumber, otp } = req.body;
   let validations = [];
   let phoneNumMessage = "";
 
-  if (!password)
-    validations.push({ key: "password", message: "Password is required" });
-  if (phoneNumber) {
-    if (phoneNumber.length !== 10) {
-      phoneNumMessage = "Phone Number should have 10 digits.";
-    }
-  } else {
+  if (!phoneNumber) {
     phoneNumMessage = "Phone Number is required.";
+  } else if (phoneNumber.length < 10 || phoneNumber.length > 10) {
+    phoneNumMessage = "Phone Number should habe 10 digits.";
   }
+
   if (phoneNumMessage) {
-    validations.push({ key: "phoneNumber", message: phoneNumMessage });
+    validations.push({ key: "Phone Number", message: phoneNumMessage });
   }
 
   if (validations.length) {
@@ -220,56 +245,72 @@ async function loginDelivery(req, res) {
   }
 
   try {
-    await client.connect();
-    const db = client.db("ImmunePlus");
-    const collection = db.collection("DeliveryPartner");
-    const user = await collection.findOne({ phoneNumber });
+    if (otp) {
+      const storedOtp = otpStorage[phoneNumber];
+      if (storedOtp && Date.now() < storedOtp.expiry) {
+        if (storedOtp.value === otp) {
+          await client.connect();
+          const db = client.db("ImmunePlus");
+          const collection = db.collection("DeliveryPartner");
+          const user = await collection.findOne({ phoneNumber });
 
-    if (user) {
-      const result = await bcrypt.compare(password, user.password);
-      if (result) {
-        if(user.isApproved == 1){
-        const userInfo = {
-          fullName: user.fullName,
-          id: user._id,
-          city: user.city,
-          licenseNo: user.licenseNo,
-          licensePhoto: user.licensePhoto,
-          address: user.address,
-          experience: user.experience,
-          phoneNumber: user.phoneNumber,
-          rcPhoto: user.rcPhoto,
-          profilePic: user.profilePic,
-        };
-        res.json({
-          status: "success",
-          message: "Login successful!",
-          user: userInfo,
-        });
-      }else if(user.isApproved == 2){
-        res.json({ status: 'decline', message: 'Your Profile is been Declined' });
-    }else {
-        res.json({ status: 'pending', message: 'Your Profile is not been approved' });
-    }
+          if (user) {
+            const result = await bcrypt.compare(password, user.password);
+            if (result) {
+              if (user.isApproved == 1) {
+                const userInfo = {
+                  fullName: user.fullName,
+                  id: user._id,
+                  city: user.city,
+                  licenseNo: user.licenseNo,
+                  licensePhoto: user.licensePhoto,
+                  address: user.address,
+                  experience: user.experience,
+                  phoneNumber: user.phoneNumber,
+                  rcPhoto: user.rcPhoto,
+                  profilePic: user.profilePic,
+                };
+                res.json({
+                  status: "success",
+                  message: "Login successful!",
+                  user: userInfo,
+                });
+              } else if (user.isApproved == 2) {
+                res.json({ status: 'decline', message: 'Your Profile is been Declined' });
+              } else {
+                res.json({ status: 'pending', message: 'Your Profile is not been approved' });
+              }
+            } else {
+              res.status(400).json({
+                status: "error",
+                message: "Invalid Phone Number",
+              });
+            }
+          } client.close();
+        } else {
+          res.status(400).json({ status: "error", message: "Invalid OTP" });
+        }
       } else {
-        res.status(400).json({
-          status: "error",
-          message: "Invalid Phone Number or password",
-        });
+        res
+          .status(400)
+          .json({ status: "error", message: "OTP expired or invalid" });
       }
     } else {
-      res
-        .status(400)
-        .json({ status: "error", message: "Invalid Phone Number or password" });
+      const otp = crypto.randomInt(100000, 999999).toString();
+      otpStorage[phoneNumber] = {
+        value: otp,
+        expiry: Date.now() + OTP_EXPIRY_TIME,
+      };
+
+      await sendOTP(phoneNumber, otp);
+      res.json({ status: "success", message: "OTP sent to your phone number" });
     }
   } catch (error) {
     res.status(500).json({
       status: "error",
-      message: "An error occurred during login",
-      reason: error.message,
+      message: "Internal Server Error",
+      error: error.message,
     });
-  } finally {
-    //await client.close();
   }
 }
 
@@ -707,7 +748,7 @@ async function getOrderHistoryById(req, res) {
     await client.connect();
     const db = client.db("ImmunePlus");
     const ordersCollection = db.collection("Orders");
-    
+
     // Find orders assigned to the delivery partner
     const orders = await ordersCollection.find({ assignedPartner: parseInt(id) }).toArray();
 
