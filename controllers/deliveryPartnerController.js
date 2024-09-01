@@ -33,9 +33,6 @@ async function registerDelivery(req, res) {
     accountHolderName,
     bankName,
   } = req.body;
-
-  console.log(req.body);
-  
   let validations = [];
   let regex = /^(?=.*[0-9])(?=.*[!@#$%^&*])(?=.*[A-Z])(?=.*[a-z])/;
 
