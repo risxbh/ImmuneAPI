@@ -133,7 +133,7 @@ async function registerUser(req, res) {
             });
 
             if (result.acknowledged === true) {
-                return res.status(200).json({ status: 'success', message: 'Pharmacy registered successfully' });
+                return res.status(200).json({ status: 'success', message: 'Pharmacy registered successfully', id: newId });
             } else {
                 res.status(400).json({ status: 'error', message: 'Registration failed' });
             }

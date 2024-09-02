@@ -267,8 +267,6 @@ async function registerDoctor(req, res) {
             fs.writeFileSync(filePath, req.file.buffer);
             const hashedPassword = await bcrypt.hash(password, 10);
 
-
-
             // Parse workinghours and workingDays as arrays of integers
             // const parsedWorkingHours = workinghours.split(',').map(Number);
             // const parsedWorkingDays = workingDays.split(',').map(Number);
