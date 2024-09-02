@@ -252,7 +252,7 @@ async function registerDoctor(req, res) {
         const existingUser = await collection.findOne({ email });
 
         if (existingUser) {
-            res.status(400).json({ status: 'error', message: 'Email already exists' });
+            return res.status(400).json({ status: 'error', message: 'Email already exists' });
         } else {
             const counter = await countersCollection.findOneAndUpdate(
                 { _id: "doctorId" },
@@ -291,11 +291,11 @@ async function registerDoctor(req, res) {
             if (result.acknowledged === true) {
                 return res.status(200).json({ status: 'success', message: 'Doctor registered successfully', id: newId });
             } else {
-                res.status(400).json({ status: 'error', message: 'Registration failed' });
+                return res.status(400).json({ status: 'error', message: 'Registration failed' });
             }
         }
     } catch (error) {
-        res.status(500).json({ status: 'error', message: 'An error occurred during registration', reason: error.message });
+        return res.status(500).json({ status: 'error', message: 'An error occurred during registration', reason: error.message });
     } finally {
         //await client.close();
     }
