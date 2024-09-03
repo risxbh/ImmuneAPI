@@ -222,11 +222,34 @@ async function getProductById(req, res) {
     }
 }
 
+async function getProductByCategory(req, res) {
+    const { category } = req.query;
+
+    if (!category) {
+        res.status(400).json({ status: 'error', message: 'Category is required' });
+        return;
+    }
+    try {
+        await client.connect();
+        const db = client.db("ImmunePlus");
+        const collection = db.collection("OTC");
+        const product = await collection.find({ category: category }).toArray();
+        if (product.length === 0) {
+            res.status(404).json({ status: 'error', message: 'Product not found' });
+        } else {
+            res.json(product);
+        }
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to fetch Product', error: error.message });
+    }
+}
+
 module.exports = {
     create,
     getAllProducts,
     upload,
     update,
     remove,
-    getProductById
+    getProductById,
+    getProductByCategory
 };
