@@ -15,11 +15,7 @@ let client = new MongoClient(url, {
     useUnifiedTopology: true,
   },
 });
-const fast2sms = require("fast-two-sms");
 
-const OTP_EXPIRY_TIME = 5 * 60 * 1000;
-let otpStorage = {};
-const crypto = require("crypto");
 async function sendOTP(phoneNumber, otp) {
   const apiKey =
     "30YlkFZVrtRHCnOIs7PDUajxwEB4evX1SfmW8cMQiGJhLTpbz6FaB3tfYDXniMQNkThgoylJPA8VH15E";
