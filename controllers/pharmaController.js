@@ -11,6 +11,39 @@ const client = new MongoClient(url, {
         deprecationErrors: true,
     }
 });
+const fast2sms = require("fast-two-sms");
+
+const OTP_EXPIRY_TIME = 5 * 60 * 1000; // 5 minutes
+let otpStorage = {}; // Temporary in-memory storage for OTPs
+const crypto = require("crypto");
+async function sendOTP(phoneNumber, otp) {
+  const apiKey =
+    "30YlkFZVrtRHCnOIs7PDUajxwEB4evX1SfmW8cMQiGJhLTpbz6FaB3tfYDXniMQNkThgoylJPA8VH15E";
+  // var options = {authorization : apiKey , message : `Your OTP is ${otp}. It is valid for 5 minutes.` ,  numbers : ['7477367855']}
+  // fast2sms.sendMessage(options).then(response=>{
+  //     console.log(response)
+  //   })
+
+  try {
+    const options = {
+      authorization: apiKey,
+      message: `Your OTP is ${otp}. It is valid for 5 minutes.`,
+      numbers: [phoneNumber], // Pass numbers as an array
+      sender_id: "IMMPLUS", // Specify the sender ID here
+    };
+    await fast2sms
+      .sendMessage(options)
+      .then((res) => {
+        console.log(res);
+      })
+      .catch((err) => {
+        console.log(err);
+      });
+    // console.log('OTP sent successfully:', response);
+  } catch (error) {
+    console.error("Error sending OTP:", error.message);
+  }
+}
 
 // Pharma login controller
 
@@ -18,150 +51,137 @@ const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
 async function registerUser(req, res) {
-    const { name, password, address, phoneNumber, licenseNo, location, email, accountHolderName, accountNumber, ifscCode, bankName } = req.body;
+    const {
+        address,
+        fullName,
+        ageGroup,
+        email,
+        gender,
+        state,
+        pincode,
+        phoneNumber,
+        previousHistory,
+        otp // Added for OTP verification
+    } = req.body;
+
     let validations = [];
-    let regex = /^(?=.*[0-9])(?=.*[!@#$%^&*])(?=.*[A-Z])(?=.*[a-z])/;
     let emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-    let passwordMessage = '';
-    let phoneNumMessage = '';
-    let locationMessage = '';
-
-    let parsedLocation = [];
-    if (location) {
-        parsedLocation = location.split(',').map(coord => parseFloat(coord));
-    }
+    let phoneNumMessage = "";
 
     if (phoneNumber) {
         if (phoneNumber.length !== 10) {
-            phoneNumMessage = 'Phone Number should have 10 digits.';
+            phoneNumMessage = "Phone Number should have 10 digits.";
         }
     } else {
-        phoneNumMessage = 'Phone Number is required.';
+        phoneNumMessage = "Phone Number is required.";
     }
+
     if (phoneNumMessage) {
-        validations.push({ key: 'Phone Number', message: phoneNumMessage });
+        validations.push({ key: "phoneNumber", message: phoneNumMessage });
     }
 
-    if (password) {
-        if (password.length < 8 || password.length > 20) {
-            passwordMessage = 'Password should be between 8 to 20 characters.';
-        } else {
-            if (!regex.test(password)) {
-                passwordMessage = 'Password should contain at least one number, one special character, and one uppercase letter.';
-            }
-        }
-    } else {
-        passwordMessage = 'Password is required.';
-    }
-
-
-    if (passwordMessage) {
-        validations.push({ key: 'password', message: passwordMessage });
-    }
-
-    if (parsedLocation.length !== 2) {
-        locationMessage = 'Location should be an array containing latitude and longitude.';
-    } else {
-        const [latitude, longitude] = parsedLocation;
-        if (isNaN(latitude) || isNaN(longitude)) {
-            locationMessage = 'Latitude and longitude should be valid numbers.';
-        }
-    }
-    if (locationMessage) {
-        validations.push({ key: 'location', message: locationMessage });
-    }
-
-    if (!address) validations.push({ key: 'address', message: 'Address is required' });
-    if (!name) validations.push({ key: 'name', message: 'Name is required' });
-    if (!email) validations.push({ key: 'email', message: 'Email is required' });
-    else if (!emailRegex.test(email)) validations.push({ key: 'email', message: 'Email is not valid' });
-    if (!licenseNo) validations.push({ key: 'licenseNo', message: 'License No is required' });
-    if (!req.file || !req.file.buffer) validations.push({ key: 'licenseImg', message: 'Image is required' });
-    if (!accountNumber) validations.push({ key: 'accountNumber', message: 'Account Number is required' });
-    if (!ifscCode) validations.push({ key: 'ifscCode', message: 'IFSC Code is required' });
-    if (!accountHolderName) validations.push({ key: 'accountHolderName', message: 'Account Holder Name is required' });
-    if (!bankName) validations.push({ key: 'bankName', message: 'Bank Name is required' });
-
+    if (!address) validations.push({ key: "address", message: "Address is required" });
+    if (!fullName) validations.push({ key: "fullName", message: "Full name is required" });
+    if (email && !emailRegex.test(email)) validations.push({ key: "email", message: "Email is not valid" });
+    if (!gender) validations.push({ key: "gender", message: "Gender is required" });
+    if (!state) validations.push({ key: "state", message: "State is required" });
+    if (!pincode) validations.push({ key: "pincode", message: "Pincode is required" });
+    if (!phoneNumber) validations.push({ key: "phoneNumber", message: "Phone number is required" });
+    if (!ageGroup) validations.push({ key: "ageGroup", message: "Age Group is required" });
 
     if (validations.length) {
-        res.status(400).json({ status: 'error', validations: validations });
+        res.status(400).json({ status: "error", validations: validations });
         return;
     }
 
     try {
         await client.connect();
         const db = client.db("ImmunePlus");
-        const collection = db.collection("Pharmacy");
+        const collection = db.collection("Users");
         const countersCollection = db.collection("Counters");
 
         const existingUser = await collection.findOne({ phoneNumber });
-
         if (existingUser) {
-            res.status(400).json({ status: 'error', message: 'Phone Number already exists' });
-        } else {
+            res.status(400).json({ status: "error", message: "Phone Number already exists" });
+            return;
+        }
 
-            const counter = await countersCollection.findOneAndUpdate(
-                { _id: "pharmacyId" },
-                { $inc: { seq: 1 } },
-                { upsert: true, returnDocument: 'after' }
-            );
-            const newId = counter.seq;
-            const filePath = path.join('uploads/pharmacy', `${newId}`);
-            if (!fs.existsSync('uploads/pharmacy')) {
-                fs.mkdirSync('uploads/pharmacy', { recursive: true });
-            }
-            fs.writeFileSync(filePath, req.file.buffer);
-            const hashedPassword = await bcrypt.hash(password, 10);
+        if (otp) {
+            // OTP verification
+            const storedOtp = otpStorage[phoneNumber];
+            if (storedOtp && Date.now() < storedOtp.expiry) {
+                if (storedOtp.value === otp) {
+                    // OTP verified, proceed with registration
 
+                    const counter = await countersCollection.findOneAndUpdate(
+                        { _id: "userId" },
+                        { $inc: { seq: 1 } },
+                        { upsert: true, returnDocument: "after" }
+                    );
+                    const newId = counter.seq;
 
+                    const result = await collection.insertOne({
+                        address,
+                        fullName,
+                        ageGroup,
+                        email,
+                        gender,
+                        state,
+                        pincode,
+                        phoneNumber,
+                        previousHistory,
+                        _id: newId,
+                    });
 
-            const result = await collection.insertOne({
-                _id: newId,
-                password: hashedPassword,
-                address,
-                name,
-                phoneNumber,
-                licenseNo,
-                bankName,
-                location:parsedLocation,
-                licenseImg: filePath,
-                accountHolderName,
-                accountNumber,
-                ifscCode,
-                isApproved: 0
-            });
-
-            if (result.acknowledged === true) {
-                return res.status(200).json({ status: 'success', message: 'Pharmacy registered successfully' });
+                    if (result.acknowledged === true) {
+                        res.status(200).json({ status: "success", message: "User registered successfully", userInfo: result });
+                    } else {
+                        res.status(400).json({ status: "error", message: "Registration failed" });
+                    }
+                } else {
+                    res.status(400).json({ status: "error", message: "Invalid OTP" });
+                }
             } else {
-                res.status(400).json({ status: 'error', message: 'Registration failed' });
+                res.status(400).json({ status: "error", message: "OTP expired or invalid" });
             }
+        } else {
+            // Generate and send OTP
+            const otp = crypto.randomInt(100000, 999999).toString();
+            otpStorage[phoneNumber] = {
+                value: otp,
+                expiry: Date.now() + OTP_EXPIRY_TIME,
+            };
+
+            await sendOTP(phoneNumber, otp);
+            res.json({ status: "success", message: "OTP sent to your phone number" });
         }
     } catch (error) {
-        res.status(500).json({ status: 'error', message: 'An error occurred during registration', reason: error.message });
+        res.status(500).json({
+            status: "error",
+            message: "An error occurred during registration",
+            reason: error.message,
+        });
     } finally {
-        // await client.close();
+        //await client.close();
     }
 }
 
+
 async function loginUser(req, res) {
-    const { phoneNumber, password } = req.body;
+    const { phoneNumber, otp } = req.body;
     let validations = [];
     let phoneNumMessage = '';
 
-    if (!password) validations.push({ key: 'password', message: 'Password is required' });
-    if (phoneNumber) {
-        if (phoneNumber.length < 10 || phoneNumber.length > 10) {
-            phoneNumMessage = 'Phone Number should habe 10 digits.';
-        }
-    } else {
+    // Validate phone number
+    if (!phoneNumber) {
         phoneNumMessage = 'Phone Number is required.';
-    }
-    if (phoneNumMessage) {
-        validations.push({ key: 'PhoneNumber', message: phoneNumMessage });
+    } else if (phoneNumber.length !== 10) {
+        phoneNumMessage = 'Phone Number should have 10 digits.';
     }
 
+    if (phoneNumMessage) {
+        validations.push({ key: 'phoneNumber', message: phoneNumMessage });
+    }
 
     if (validations.length) {
         res.status(400).json({ status: 'error', validations: validations });
@@ -172,40 +192,69 @@ async function loginUser(req, res) {
         await client.connect();
         const db = client.db("ImmunePlus");
         const collection = db.collection("Pharmacy");
+
         const user = await collection.findOne({ phoneNumber: phoneNumber });
+        if(user.isApproved != 1){
+          res.status(400).json({ status: "error", validations: "Your Account is not Approved yet." });
+          return;
+        }
+        if (otp) {
+            // OTP verification
+            const storedOtp = otpStorage[phoneNumber];
+            if (storedOtp && Date.now() < storedOtp.expiry) {
+                if (storedOtp.value === otp) {
+                    // Successful OTP verification
+                  
+                    if (user) {
+                        if (user.isApproved == 1) {
+                            const userInfo = {
+                                name: user.name,
+                                id: user._id,
+                                address: user.address,
+                                licenseNo: user.licenseNo,
+                                phoneNumber: user.phoneNumber,
+                                previousHistory: user.previousHistory,
+                                licenseImg: user.licenseImg
+                            };
 
-        if (user) {
-            const result = await bcrypt.compare(password, user.password);
-            if (result) {
-                if (user.isApproved == 1) {
-                    const userInfo = {
-                        name: user.name,
-                        id: user._id,
-                        address: user.address,
-                        licenseNo: user.licenseNo,
-                        phoneNumber: user.phoneNumber,
-                        previousHistory: user.previousHistory,
-                        licenseImg: user.licenseImg
-                    };
+                            res.json({ status: 'success', message: 'Login successful!', user: userInfo });
+                        } else if (user.isApproved == 2) {
+                            res.json({ status: 'decline', message: 'Your Profile has been Declined' });
+                        } else {
+                            res.json({ status: 'pending', message: 'Your Profile is not approved' });
+                        }
+                    } else {
+                        res.status(400).json({ status: 'error', message: 'Invalid Phone Number' });
+                    }
 
-                    res.json({ status: 'success', message: 'Login successfull!', user: userInfo });
-                } else if (user.isApproved == 2) {
-                    res.json({ status: 'decline', message: 'Your Profile is been Declined' });
+                    client.close();
                 } else {
-                    res.json({ status: 'pending', message: 'Your Profile is not been approved' });
+                    res.status(400).json({ status: 'error', message: 'Invalid OTP' });
                 }
             } else {
-                res.status(400).json({ status: 'error', message: 'Invalid Phone Number or password' });
+                res.status(400).json({ status: 'error', message: 'OTP expired or invalid' });
             }
         } else {
-            res.status(400).json({ status: 'error', message: 'Invalid email or password' });
+            // Generate and send OTP
+            const otp = crypto.randomInt(100000, 999999).toString();
+            otpStorage[phoneNumber] = {
+                value: otp,
+                expiry: Date.now() + OTP_EXPIRY_TIME,
+            };
+
+            await sendOTP(phoneNumber, otp);
+            res.json({ status: 'success', message: 'OTP sent to your phone number' });
         }
+    } catch (error) {
+        res.status(500).json({
+            status: 'error',
+            message: 'An error occurred during login',
+            reason: error.message,
+        });
     } finally {
-        // await client.close();
+        //await client.close();
     }
 }
-
-// User registration controller
 
 
 async function updateUser(req, res) {

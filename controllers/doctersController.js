@@ -22,6 +22,40 @@ let client = new MongoClient(url, {
   },
 });
 
+const fast2sms = require("fast-two-sms");
+
+const OTP_EXPIRY_TIME = 5 * 60 * 1000; // 5 minutes
+let otpStorage = {}; // Temporary in-memory storage for OTPs
+const crypto = require("crypto");
+async function sendOTP(phoneNumber, otp) {
+  const apiKey =
+    "30YlkFZVrtRHCnOIs7PDUajxwEB4evX1SfmW8cMQiGJhLTpbz6FaB3tfYDXniMQNkThgoylJPA8VH15E";
+  // var options = {authorization : apiKey , message : `Your OTP is ${otp}. It is valid for 5 minutes.` ,  numbers : ['7477367855']}
+  // fast2sms.sendMessage(options).then(response=>{
+  //     console.log(response)
+  //   })
+
+  try {
+    const options = {
+      authorization: apiKey,
+      message: `Your OTP is ${otp}. It is valid for 5 minutes.`,
+      numbers: [phoneNumber], // Pass numbers as an array
+      sender_id: "IMMPLUS", // Specify the sender ID here
+    };
+    await fast2sms
+      .sendMessage(options)
+      .then((res) => {
+        console.log(res);
+      })
+      .catch((err) => {
+        console.log(err);
+      });
+    // console.log('OTP sent successfully:', response);
+  } catch (error) {
+    console.error("Error sending OTP:", error.message);
+  }
+}
+
 let isConnected = false;
 
 async function connectToDatabase() {
@@ -243,182 +277,167 @@ module.exports = bookAppointment;
 
 async function registerDoctor(req, res) {
   const {
-    name,
-    hospital,
-    about,
-    type,
-    patients,
-    experience,
-    rating,
-    location,
-    specialist,
-    videoFee,
-    appointmentFee,
-    email,
-    password,
-    workinghours,
-    accountNumber,
-    ifscCode,
-    accountHolderName,
-    bankName,
+      name,
+      hospital,
+      about,
+      type,
+      patients,
+      experience,
+      rating,
+      location,
+      specialist,
+      videoFee,
+      appointmentFee,
+      email,
+      otp, // Added for OTP verification
+      workinghours,
+      accountNumber,
+      ifscCode,
+      accountHolderName,
+      bankName,
+      phoneNumber
   } = req.body;
+
   let validations = [];
-  let regex = /^(?=.*[0-9])(?=.*[!@#$%^&*])(?=.*[A-Z])(?=.*[a-z])/;
+  let phoneNumMessage = "";
   let emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-  let passwordMessage = "";
-
-  if (password) {
-    if (password.length < 8 || password.length > 20) {
-      passwordMessage = "Password should be between 8 to 20 characters.";
-    } else {
-      if (!regex.test(password)) {
-        passwordMessage =
-          "Password should contain at least one number, one special character, and one uppercase letter.";
+  if (phoneNumber) {
+      if (phoneNumber.length !== 10) {
+          phoneNumMessage = "Phone Number should have 10 digits.";
       }
-    }
   } else {
-    passwordMessage = "Password is required.";
+      phoneNumMessage = "Phone Number is required.";
   }
 
-  if (passwordMessage) {
-    validations.push({ key: "password", message: passwordMessage });
+  if (phoneNumMessage) {
+      validations.push({ key: "phoneNumber", message: phoneNumMessage });
   }
 
-  if (!password)
-    validations.push({ key: "password", message: "Password is required" });
-  if (!req.file || !req.file.buffer)
-    validations.push({ key: "img", message: "Image is required" });
   if (!email) validations.push({ key: "email", message: "Email is required" });
-  else if (!emailRegex.test(email))
-    validations.push({ key: "email", message: "Email is not valid" });
+  else if (!emailRegex.test(email)) {
+      validations.push({ key: "email", message: "Email is not valid" });
+  }
+
   if (!name) validations.push({ key: "name", message: "Name is required" });
-  if (!hospital)
-    validations.push({ key: "hospital", message: "Hospital is required" });
+  if (!hospital) validations.push({ key: "hospital", message: "Hospital is required" });
   if (!about) validations.push({ key: "about", message: "About is required" });
   if (!type) validations.push({ key: "type", message: "Type is required" });
-  if (!patients)
-    validations.push({ key: "patients", message: "Patients is required" });
-  if (!experience)
-    validations.push({ key: "experience", message: "Experience is required" });
-  if (!specialist)
-    validations.push({ key: "specialist", message: "specialist is required" });
-  if (!videoFee)
-    validations.push({ key: "videoFee", message: "Video Fee is required" });
-  if (!appointmentFee)
-    validations.push({
-      key: "appointmentFee",
-      message: "Appointment Fee is required",
-    });
-  if (!location)
-    validations.push({ key: "location", message: "Location is required" });
-  if (!workinghours)
-    validations.push({
-      key: "workinghours",
-      message: "Working Hours is required",
-    });
-  if (!accountNumber)
-    validations.push({
-      key: "accountNumber",
-      message: "Account Number is required",
-    });
-  if (!ifscCode)
-    validations.push({ key: "ifscCode", message: "IFSC Code is required" });
-  if (!accountHolderName)
-    validations.push({
-      key: "accountHolderName",
-      message: "Account Holder Name is required",
-    });
-  if (!bankName)
-    validations.push({ key: "bankName", message: "Bank Name is required" });
+  if (!patients) validations.push({ key: "patients", message: "Patients is required" });
+  if (!experience) validations.push({ key: "experience", message: "Experience is required" });
+  if (!specialist) validations.push({ key: "specialist", message: "Specialist is required" });
+  if (!videoFee) validations.push({ key: "videoFee", message: "Video Fee is required" });
+  if (!appointmentFee) validations.push({ key: "appointmentFee", message: "Appointment Fee is required" });
+  if (!location) validations.push({ key: "location", message: "Location is required" });
+  if (!workinghours) validations.push({ key: "workinghours", message: "Working Hours is required" });
+  if (!accountNumber) validations.push({ key: "accountNumber", message: "Account Number is required" });
+  if (!ifscCode) validations.push({ key: "ifscCode", message: "IFSC Code is required" });
+  if (!accountHolderName) validations.push({ key: "accountHolderName", message: "Account Holder Name is required" });
+  if (!bankName) validations.push({ key: "bankName", message: "Bank Name is required" });
+  if (!otp) validations.push({ key: "otp", message: "OTP is required" });
+
+  if (!req.file || !req.file.buffer) validations.push({ key: "img", message: "Image is required" });
 
   if (validations.length) {
-    res.status(400).json({ status: "error", validations: validations });
-    return;
+      res.status(400).json({ status: "error", validations: validations });
+      return;
   }
 
   try {
-    await client.connect();
-    const db = client.db("ImmunePlus");
-    const collection = db.collection("Doctors");
-    const countersCollection = db.collection("Counters");
+      await client.connect();
+      const db = client.db("ImmunePlus");
+      const collection = db.collection("Doctors");
+      const countersCollection = db.collection("Counters");
 
-    const existingUser = await collection.findOne({ email });
+      const existingUser = await collection.findOne({ phoneNumber });
 
-    if (existingUser) {
-      res
-        .status(400)
-        .json({ status: "error", message: "Email already exists" });
-    } else {
-      const counter = await countersCollection.findOneAndUpdate(
-        { _id: "doctorId" },
-        { $inc: { seq: 1 } },
-        { upsert: true, returnDocument: "after" }
-      );
-      const newId = counter.seq;
-      const filePath = path.join("uploads/doctor", `${newId}`);
-      if (!fs.existsSync("uploads/doctor")) {
-        fs.mkdirSync("uploads/doctor", { recursive: true });
+      if (existingUser) {
+          res.status(400).json({ status: "error", message: "Phone Number already exists" });
+          return;
       }
-      fs.writeFileSync(filePath, req.file.buffer);
-      const hashedPassword = await bcrypt.hash(password, 10);
 
-      // Parse workinghours and workingDays as arrays of integers
-      // const parsedWorkingHours = workinghours.split(',').map(Number);
-      // const parsedWorkingDays = workingDays.split(',').map(Number);
-      // const parsedAvailableSlots = availableSlots.split(',').map(Number);
+      if (otp) {
+          // OTP verification
+          const storedOtp = otpStorage[phoneNumber];
+          if (storedOtp && Date.now() < storedOtp.expiry) {
+              if (storedOtp.value === otp) {
+                  // OTP verified, proceed with registration
 
-      // const workingHoursData = await workingHoursCollection.find({ _id: { $in: parsedWorkingHours } }).toArray();
-      // const workingDaysData = await workingDaysCollection.find({ _id: { $in: parsedWorkingDays } }).toArray();
+                  const counter = await countersCollection.findOneAndUpdate(
+                      { _id: "doctorId" },
+                      { $inc: { seq: 1 } },
+                      { upsert: true, returnDocument: "after" }
+                  );
+                  const newId = counter.seq;
+                  const filePath = path.join("uploads/doctor", `${newId}`);
 
-      // const workingHoursNames = workingHoursData.map(item => item.name);
-      // const workingDaysIndexes = workingDaysData.map(item => item.name);
+                  if (!fs.existsSync("uploads/doctor")) {
+                      fs.mkdirSync("uploads/doctor", { recursive: true });
+                  }
 
-      const result = await collection.insertOne({
-        password: hashedPassword,
-        name,
-        hospital,
-        about,
-        type,
-        patients,
-        experience,
-        rating,
-        location,
-        specialist,
-        videoFee,
-        appointmentFee,
-        email,
-        workinghours,
-        _id: newId,
-        accountNumber,
-        ifscCode,
-        accountHolderName,
-        bankName,
-        isApproved: 0,
-      });
+                  fs.writeFileSync(filePath, req.file.buffer);
 
-      if (result.acknowledged === true) {
-        return res.status(200).json({
-          status: "success",
-          message: "Doctor registered successfully",
-          id: newId,
-        });
+                  // Save doctor details in the database
+                  const result = await collection.insertOne({
+                      _id: newId,
+                      name,
+                      hospital,
+                      about,
+                      type,
+                      patients,
+                      experience,
+                      rating,
+                      location,
+                      specialist,
+                      videoFee,
+                      appointmentFee,
+                      email,
+                      workinghours,
+                      accountNumber,
+                      ifscCode,
+                      accountHolderName,
+                      bankName,
+                      isApproved: 0,
+                      phoneNumber
+                  });
+
+                  if (result.acknowledged) {
+                      res.status(200).json({
+                          status: "success",
+                          message: "Doctor registered successfully",
+                          id: newId,
+                      });
+                  } else {
+                      res.status(400).json({ status: "error", message: "Registration failed" });
+                  }
+              } else {
+                  res.status(400).json({ status: "error", message: "Invalid OTP" });
+              }
+          } else {
+              res.status(400).json({ status: "error", message: "OTP expired or invalid" });
+          }
       } else {
-        res
-          .status(400)
-          .json({ status: "error", message: "Registration failed" });
+          // Generate and send OTP
+          const otp = crypto.randomInt(100000, 999999).toString();
+          otpStorage[phoneNumber] = {
+              value: otp,
+              expiry: Date.now() + OTP_EXPIRY_TIME,
+          };
+
+          await sendOTP(phoneNumber, otp);
+          res.json({ status: "success", message: "OTP sent to your phone number" });
       }
-    }
   } catch (error) {
-    res.status(500).json({
-      status: "error",
-      message: "An error occurred during registration",
-      reason: error.message,
-    });
+      res.status(500).json({
+          status: "error",
+          message: "An error occurred during registration",
+          reason: error.message,
+      });
   } finally {
-    //await client.close();
+      //await client.close();
   }
 }
+
 
 async function createSchedule(req, res) {
   try {
@@ -663,78 +682,100 @@ async function filterSchedules(req, res) {
 }
 
 async function loginDoctor(req, res) {
-  const { email, password } = req.body;
-  let validations = [];
+    const { phoneNumber, otp } = req.body;
+    let validations = [];
+    let phoneNumMessage = "";
+  
+    // Validate phone number
+    if (!phoneNumber) {
+      phoneNumMessage = "Phone Number is required.";
+    } else if (phoneNumber.length !== 10) {
+      phoneNumMessage = "Phone Number should have 10 digits.";
+    }
+  
+    if (phoneNumMessage) {
+      validations.push({ key: "phoneNumber", message: phoneNumMessage });
+    }
+  
+    if (validations.length) {
+      res.status(400).json({ status: "error", validations: validations });
+      return;
+    }
 
-  if (!password)
-    validations.push({ key: "password", message: "Password is required" });
-  if (!email) validations.push({ key: "email", message: "Email is required" });
+  
+    try {
+      await client.connect();
+      const db = client.db("ImmunePlus");
+      const collection = db.collection("Doctors");
 
-  if (validations.length) {
-    res.status(400).json({ status: "error", validations: validations });
-    return;
-  }
+      const user = await collection.findOne({ phoneNumber: phoneNumber });
+      if(user.isApproved != 1){
+        res.status(400).json({ status: "error", validations: "Your Account is not Approved yet." });
+        return;
+      }
+      if (otp) {
+        // OTP verification
+        const storedOtp = otpStorage[phoneNumber];
+        if (storedOtp && Date.now() < storedOtp.expiry) {
+          if (storedOtp.value === otp) {
+            // Successful OTP verification
 
-  try {
-    await connectToDatabase();
-    await client.connect();
-    const db = client.db("ImmunePlus");
-    const collection = db.collection("Doctors");
-    const user = await collection.findOne({ email: email });
-
-    if (user) {
-      const result = await bcrypt.compare(password, user.password);
-      if (result) {
-        if (user.isApproved == 1) {
-          const userInfo = {
-            name: user.name,
-            id: user._id,
-            hospital: user.hospital,
-            location: user.location,
-            about: user.about,
-            patients: user.patients,
-            img: user.img,
-            experience: user.experience,
-            workinghours: user.workinghours,
-            totalslots: user.totalslots,
-            availableSlots: user.availableSlots,
-            type: user.type,
-            specialist: user.specialist,
-            workingDays: user.workingDays,
-            videoFee: user.videoFee,
-            appointmentFee: user.appointmentFee,
-          };
-
-          res.json({
-            status: "success",
-            message: "Login successfull!",
-            user: userInfo,
-          });
-        } else if (user.isApproved == 2) {
-          res.json({
-            status: "decline",
-            message: "Your Profile is been Declined",
-          });
+            if (user) {
+              const userInfo = {
+                name: user.name,
+                id: user._id,
+                hospital: user.hospital,
+                location: user.location,
+                about: user.about,
+                patients: user.patients,
+                img: user.img,
+                experience: user.experience,
+                workinghours: user.workinghours,
+                totalslots: user.totalslots,
+                availableSlots: user.availableSlots,
+                type: user.type,
+                specialist: user.specialist,
+                workingDays: user.workingDays,
+                videoFee: user.videoFee,
+                appointmentFee: user.appointmentFee,
+              };
+  
+              res.json({
+                status: "success",
+                message: "Login successful!",
+                user: userInfo,
+              });
+            } else {
+              res.status(400).json({ status: "error", message: "Invalid Phone Number" });
+            }
+  
+            //client.close();
+          } else {
+            res.status(400).json({ status: "error", message: "Invalid OTP" });
+          }
         } else {
-          res.json({
-            status: "pending",
-            message: "Your Profile is not been approved",
-          });
+          res.status(400).json({ status: "error", message: "OTP expired or invalid" });
         }
       } else {
-        res
-          .status(400)
-          .json({ status: "error", message: "Invalid Email or password" });
+        // Generate and send OTP
+        const otp = crypto.randomInt(100000, 999999).toString();
+        otpStorage[phoneNumber] = {
+          value: otp,
+          expiry: Date.now() + OTP_EXPIRY_TIME,
+        };
+  
+        await sendOTP(phoneNumber, otp);
+        res.json({ status: "success", message: "OTP sent to your phone number" });
       }
-    } else {
-      res
-        .status(400)
-        .json({ status: "error", message: "Invalid Email or password" });
+    } catch (error) {
+      res.status(500).json({
+        status: "error",
+        message: "Internal Server Error",
+        error: error.message,
+      });
     }
-  } finally {
-    //await client.close();
   }
-}
+  
 
 async function updateDoctor(req, res) {
   try {
@@ -1277,6 +1318,131 @@ async function searchDoctors(req, res) {
     //await client.close();
   }
 }
+async function searchFilterDoctors(req, res) {
+    try {
+        await client.connect();
+        const db = client.db("ImmunePlus");
+        const doctorsCollection = db.collection("Doctors");
+        const availabilitiesCollection = db.collection("doctoravailabilities");
+    
+        // Extract filters from the request body
+        const { keyword, treatmentType, specialist, filterDate, time } = req.body;
+    
+        if (!keyword) {
+          return res.status(400).json({
+            status: "error",
+            message: "Keyword is required for search",
+          });
+        }
+    
+        // Define type mapping with partial matching
+        const typeMapping = {
+          homeopathy: 1,
+          allopathy: 2,
+          ayurveda: 3,
+        };
+    
+        // Find if the keyword matches or is a part of any specific types
+        let matchedType = null;
+        for (const key in typeMapping) {
+          if (key.includes(keyword.toLowerCase())) {
+            matchedType = typeMapping[key];
+            break;
+          }
+        }
+    
+        // Build the initial search query with keyword
+        const searchQuery = {
+          $or: [
+            { name: { $regex: keyword, $options: "i" } },
+            { hospital: { $regex: keyword, $options: "i" } },
+            { specialist: { $regex: keyword, $options: "i" } },
+            { location: { $regex: keyword, $options: "i" } },
+            { experience: { $regex: keyword, $options: "i" } },
+            { rating: { $regex: keyword, $options: "i" } },
+          ],
+        };
+    
+        // If a type match was found, add it to the search query
+        if (matchedType !== null) {
+          searchQuery.$or.push({ type: matchedType });
+        }
+    
+        // Build the filter object
+        let filters = {};
+        if (treatmentType && treatmentType !== "0") {
+          filters.type = parseInt(treatmentType);
+        }
+        if (specialist && specialist !== "0") {
+          filters.specialist = { $regex: specialist, $options: "i" };
+        }
+    
+        // Aggregate to join Doctors with doctoravailabilities and apply date/time filters
+        const pipeline = [
+          {
+            $match: searchQuery, // Apply initial search filters
+          },
+          {
+            $lookup: {
+              from: 'doctoravailabilities', // Name of the schedule collection
+              localField: '_id', // Doctor's _id field
+              foreignField: 'doctorId', // doctorId in schedule
+              as: 'schedules', // Alias for the joined data
+            },
+          },
+          {
+            $addFields: {
+              schedules: {
+                $filter: {
+                  input: '$schedules',
+                  as: 'schedule',
+                  cond: {
+                    $and: [
+                      filterDate && filterDate !== '0'
+                        ? { $eq: [{ $toDate: '$$schedule.date' }, new Date(filterDate)] } // Match by date
+                        : { $literal: true },
+                      time && time !== '0'
+                        ? { $eq: ['$$schedule.time', time] } // Match by time
+                        : { $literal: true },
+                    ],
+                  },
+                },
+              },
+            },
+          },
+          {
+            $match: {
+              'schedules.0': { $exists: true }, // Ensure at least one matching schedule exists
+            },
+          },
+        ];
+    
+        // Execute the aggregation pipeline
+        const doctors = await doctorsCollection.aggregate(pipeline).toArray();
+    
+        if (doctors.length > 0) {
+          res.status(200).json({
+            status: 'success',
+            data: doctors,
+          });
+        } else {
+          res.status(404).json({
+            status: 'error',
+            message: 'No doctors found matching the criteria',
+          });
+        }
+      } catch (error) {
+        res.status(500).json({
+          status: 'error',
+          message: 'An error occurred during the search',
+          reason: error.message,
+        });
+      } finally {
+        // await client.close();
+      }
+  }
+  
+  
 
 module.exports = {
   loginDoctor,
@@ -1300,4 +1466,5 @@ module.exports = {
   getBookingById,
   getSchedulebyIdDetails,
   searchDoctors,
+  searchFilterDoctors
 };

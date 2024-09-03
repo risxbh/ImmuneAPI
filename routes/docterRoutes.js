@@ -21,6 +21,7 @@ const {
   getBookingById,
   getScheduleByScheduleId,
   searchDoctors,
+  searchFilterDoctors
 } = require("../controllers/doctersController");
 
 const router = express.Router();
@@ -45,5 +46,6 @@ router.get("/dashboard", Dashboard);
 router.get("/getBookbyId", getBookingById);
 router.get("/scheduleByIdDetails", getSchedulebyIdDetails);
 router.post("/search", searchDoctors);
+router.post("/searchFilter", searchFilterDoctors);
 
 module.exports = router;

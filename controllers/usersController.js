@@ -133,75 +133,49 @@ async function loginUser(req, res) {
 // User registration controller
 async function registerUser(req, res) {
   const {
-    password,
-    address,
-    fullName,
-    ageGroup,
-    email,
-    gender,
-    state,
-    pincode,
-    phoneNumber,
-    previousHistory,
+      address,
+      fullName,
+      ageGroup,
+      email,
+      gender,
+      state,
+      pincode,
+      phoneNumber,
+      previousHistory,
+      otp // Added for OTP verification
   } = req.body;
+  
   let validations = [];
   let regex = /^(?=.*[0-9])(?=.*[!@#$%^&*])(?=.*[A-Z])(?=.*[a-z])/;
   let emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-  let passwordMessage = "";
   let phoneNumMessage = "";
 
   if (phoneNumber) {
-    if (phoneNumber.length < 10 || phoneNumber.length > 10) {
-      phoneNumMessage = "Phone Number should habe 10 digits.";
-    }
-  } else {
-    phoneNumMessage = "Phone Number is required.";
-  }
-  if (phoneNumMessage) {
-    validations.push({ key: "Phone Number", message: phoneNumMessage });
-  }
-
-  if (password) {
-    if (password.length < 8 || password.length > 20) {
-      passwordMessage = "Password should be between 8 to 20 characters.";
-    } else {
-      if (!regex.test(password)) {
-        passwordMessage =
-          "Password should contain at least one number, one special character, and one uppercase letter.";
+      if (phoneNumber.length !== 10) {
+          phoneNumMessage = "Phone Number should have 10 digits.";
       }
-    }
   } else {
-    passwordMessage = "Password is required.";
+      phoneNumMessage = "Phone Number is required.";
   }
 
-  if (passwordMessage) {
-    validations.push({ key: "password", message: passwordMessage });
+  if (phoneNumMessage) {
+      validations.push({ key: "phoneNumber", message: phoneNumMessage });
   }
 
-  if (!address)
-    validations.push({ key: "address", message: "Address is required" });
-  if (!fullName)
-    validations.push({ key: "fullName", message: "Full name is required" });
-  if (!email) validations.push({ key: "email", message: "Email is required" });
-  else if (!emailRegex.test(email))
-    validations.push({ key: "email", message: "Email is not valid" });
-  if (!gender)
-    validations.push({ key: "gender", message: "Gender is required" });
+
+
+  if (!address) validations.push({ key: "address", message: "Address is required" });
+  if (!fullName) validations.push({ key: "fullName", message: "Full name is required" });
+  if (email && !emailRegex.test(email)) validations.push({ key: "email", message: "Email is not valid" });
+  if (!gender) validations.push({ key: "gender", message: "Gender is required" });
   if (!state) validations.push({ key: "state", message: "State is required" });
-  if (!pincode)
-    validations.push({ key: "pincode", message: "Pincode is required" });
-  if (!phoneNumber)
-    validations.push({
-      key: "phoneNumber",
-      message: "Phone number is required",
-    });
-  if (!ageGroup)
-    validations.push({ key: "ageGroup", message: "Age Group is required" });
+  if (!pincode) validations.push({ key: "pincode", message: "Pincode is required" });
+  if (!phoneNumber) validations.push({ key: "phoneNumber", message: "Phone number is required" });
+  if (!ageGroup) validations.push({ key: "ageGroup", message: "Age Group is required" });
 
   if (validations.length) {
-    res.status(400).json({ status: "error", validations: validations });
-    return;
+      res.status(400).json({ status: "error", validations: validations });
+      return;
   }
 
   try {
@@ -211,60 +185,80 @@ async function registerUser(req, res) {
     const countersCollection = db.collection("Counters");
 
     const existingUser = await collection.findOne({ phoneNumber });
-
-    if (existingUser) {
-      res
-        .status(400)
-        .json({ status: "error", message: "Phone Number already exists" });
-    } else {
-      const hashedPassword = await bcrypt.hash(password, 10);
-
-      const counter = await countersCollection.findOneAndUpdate(
-        { _id: "userId" },
-        { $inc: { seq: 1 } },
-        { upsert: true, returnDocument: "after" }
-      );
-      const newId = counter.seq;
-
-      const result = await collection.insertOne({
-        password: hashedPassword,
-        address,
-        fullName,
-        ageGroup,
-        email,
-        gender,
-        state,
-        pincode,
-        phoneNumber,
-        previousHistory,
-        _id: newId,
-      });
-
-      if (result.acknowledged === true) {
-        return res
-          .status(200)
-          .json({ status: "success", message: "User registered successfully" });
-      } else {
-        res
-          .status(400)
-          .json({ status: "error", message: "Registration failed" });
-      }
+    if(existingUser){
+      res.status(400).json({ status: "error", validations: "Phone Number already exists." });
+      return;
     }
+      if (otp) {
+          // OTP verification
+          const storedOtp = otpStorage[phoneNumber];
+          if (storedOtp && Date.now() < storedOtp.expiry) {
+              if (storedOtp.value === otp) {
+                  // OTP verified, proceed with registration
+        
+ 
+
+                  if (existingUser) {
+                      res.status(400).json({ status: "error", message: "Phone Number already exists" });
+                  } else {
+
+                      const counter = await countersCollection.findOneAndUpdate(
+                          { _id: "userId" },
+                          { $inc: { seq: 1 } },
+                          { upsert: true, returnDocument: "after" }
+                      );
+                      const newId = counter.seq;
+
+                      const result = await collection.insertOne({
+                          address,
+                          fullName,
+                          ageGroup,
+                          email,
+                          gender,
+                          state,
+                          pincode,
+                          phoneNumber,
+                          previousHistory,
+                          _id: newId,
+                      });
+
+                      if (result.acknowledged === true) {
+                          res.status(200).json({ status: "success", message: "User registered successfully",userInfo:result });
+                      } else {
+                          res.status(400).json({ status: "error", message: "Registration failed" });
+                      }
+                  }
+              } else {
+                  res.status(400).json({ status: "error", message: "Invalid OTP" });
+              }
+          } else {
+              res.status(400).json({ status: "error", message: "OTP expired or invalid" });
+          }
+      } else {
+          // Generate and send OTP
+          const otp = crypto.randomInt(100000, 999999).toString();
+          otpStorage[phoneNumber] = {
+              value: otp,
+              expiry: Date.now() + OTP_EXPIRY_TIME,
+          };
+
+          await sendOTP(phoneNumber, otp);
+          res.json({ status: "success", message: "OTP sent to your phone number" });
+      }
   } catch (error) {
-    res.status(500).json({
-      status: "error",
-      message: "An error occurred during registration",
-      reason: error,
-    });
+      res.status(500).json({
+          status: "error",
+          message: "An error occurred during registration",
+          reason: error.message,
+      });
   } finally {
-    // await client.close();
+      //await client.close();
   }
 }
 
 async function updateUser(req, res) {
   const {
     id,
-    password,
     address,
     fullName,
     ageGroup,
@@ -281,16 +275,6 @@ async function updateUser(req, res) {
 
   if (!id) validations.push({ key: "id", message: "User ID is required" });
 
-  if (
-    password &&
-    (password.length < 8 || password.length > 20 || !regex.test(password))
-  ) {
-    validations.push({
-      key: "password",
-      message:
-        "Password should be between 8 to 20 characters, contain at least one number, one special character, and one uppercase letter.",
-    });
-  }
 
   if (email && !emailRegex.test(email))
     validations.push({ key: "email", message: "Email is not valid" });
@@ -313,10 +297,7 @@ async function updateUser(req, res) {
     }
 
     const updatedFields = {};
-    if (password) {
-      const hashedPassword = await bcrypt.hash(password, 10);
-      updatedFields.password = hashedPassword;
-    }
+
     if (address) updatedFields.address = address;
     if (fullName) updatedFields.fullName = fullName;
     if (ageGroup) updatedFields.ageGroup = ageGroup;

@@ -18,198 +18,207 @@ let client = new MongoClient(url, {
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
+const fast2sms = require("fast-two-sms");
 
-async function registerDelivery(req, res) {
-  const {
-    fullname,
-    phoneNumber,
-    address,
-    licenseNo,
-    experience,
-    city,
-    password,
-    accountNumber,
-    ifscCode,
-    accountHolderName,
-    bankName,
-  } = req.body;
-  let validations = [];
-  let regex = /^(?=.*[0-9])(?=.*[!@#$%^&*])(?=.*[A-Z])(?=.*[a-z])/;
-
-  let passwordMessage = "";
-  let phoneNumMessage = "";
-
-  if (password) {
-    if (password.length < 8 || password.length > 20) {
-      passwordMessage = "Password should be between 8 to 20 characters.";
-    } else {
-      if (!regex.test(password)) {
-        passwordMessage =
-          "Password should contain at least one number, one special character, and one uppercase letter.";
-      }
-    }
-  } else {
-    passwordMessage = "Password is required.";
-  }
-
-  if (passwordMessage) {
-    validations.push({ key: "password", message: passwordMessage });
-  }
-
-  if (
-    !req.files ||
-    !req.files.licensePhoto ||
-    !req.files.licensePhoto[0].buffer
-  )
-    validations.push({
-      key: "licensePhoto",
-      message: "licensePhoto is required",
-    });
-  if (!req.files || !req.files.rcPhoto || !req.files.rcPhoto[0].buffer)
-    validations.push({ key: "rcPhoto", message: "rcPhoto is required" });
-  if (!req.files || !req.files.profilePic || !req.files.profilePic[0].buffer)
-    validations.push({
-      key: "Profile Pic",
-      message: "Profile Pic is required",
-    });
-  if (!fullname)
-    validations.push({ key: "fullname", message: "Full Name is required" });
-  if (!address)
-    validations.push({ key: "address", message: "Address is required" });
-  if (!licenseNo)
-    validations.push({ key: "licenseNo", message: "License No is required" });
-  if (!city) validations.push({ key: "city", message: "City is required" });
-  if (!experience)
-    validations.push({ key: "experience", message: "Experience is required" });
-  if (!accountNumber)
-    validations.push({
-      key: "accountNumber",
-      message: "Account Number is required",
-    });
-  if (!ifscCode)
-    validations.push({ key: "ifscCode", message: "IFSC Code is required" });
-  if (!accountHolderName)
-    validations.push({
-      key: "accountHolderName",
-      message: "Account Holder Name is required",
-    });
-  if (!bankName)
-    validations.push({ key: "bankName", message: "Bank Name is required" });
-  if (phoneNumber) {
-    if (phoneNumber.length !== 10) {
-      phoneNumMessage = "Phone Number should have 10 digits.";
-    }
-  } else {
-    phoneNumMessage = "Phone Number is required.";
-  }
-  if (phoneNumMessage) {
-    validations.push({ key: "phoneNumber", message: phoneNumMessage });
-  }
-
-  if (validations.length) {
-    res.status(400).json({ status: "error", validations: validations });
-    return;
-  }
+const OTP_EXPIRY_TIME = 5 * 60 * 1000; // 5 minutes
+let otpStorage = {}; // Temporary in-memory storage for OTPs
+const crypto = require("crypto");
+async function sendOTP(phoneNumber, otp) {
+  const apiKey =
+    "30YlkFZVrtRHCnOIs7PDUajxwEB4evX1SfmW8cMQiGJhLTpbz6FaB3tfYDXniMQNkThgoylJPA8VH15E";
+  // var options = {authorization : apiKey , message : `Your OTP is ${otp}. It is valid for 5 minutes.` ,  numbers : ['7477367855']}
+  // fast2sms.sendMessage(options).then(response=>{
+  //     console.log(response)
+  //   })
 
   try {
-    await client.connect();
-    const db = client.db("ImmunePlus");
-    const collection = db.collection("DeliveryPartner");
-    const countersCollection = db.collection("Counters");
-
-    const existingUser = await collection.findOne({ phoneNumber });
-
-    if (existingUser) {
-      res
-        .status(400)
-        .json({ status: "error", message: "Phone Number already exists" });
-    } else {
-      const counter = await countersCollection.findOneAndUpdate(
-        { _id: "deliveryPartnerId" },
-        { $inc: { seq: 1 } },
-        { upsert: true, returnDocument: "after" }
-      );
-      const newId = counter.seq;
-
-      const licenseFilePath = path.join("uploads/delivery/license", `${newId}`);
-      const rcFilePath = path.join("uploads/delivery/rc", `${newId}`);
-      const profileFilePath = path.join(
-        "uploads/delivery/profilePic",
-        `${newId}`
-      );
-
-      if (!fs.existsSync("uploads/delivery/license")) {
-        fs.mkdirSync("uploads/delivery/license", { recursive: true });
-      }
-
-      if (!fs.existsSync("uploads/delivery/rc")) {
-        fs.mkdirSync("uploads/delivery/rc", { recursive: true });
-      }
-      if (!fs.existsSync("uploads/delivery/profile")) {
-        fs.mkdirSync("uploads/delivery/profilePic", { recursive: true });
-      }
-
-      fs.writeFileSync(licenseFilePath, req.files.licensePhoto[0].buffer);
-      fs.writeFileSync(rcFilePath, req.files.rcPhoto[0].buffer);
-      fs.writeFileSync(profileFilePath, req.files.profilePic[0].buffer);
-
-      const hashedPassword = await bcrypt.hash(password, 10);
-
-      const result = await collection.insertOne({
-        _id: newId,
-        fullname,
-        phoneNumber,
-        address,
-        licenseNo,
-        licensePhoto: licenseFilePath,
-        rcPhoto: rcFilePath,
-        experience,
-        city,
-        password: hashedPassword,
-        profilePic: profileFilePath,
-        accountNumber,
-        ifscCode,
-        accountHolderName,
-        bankName,
-        isApproved: 0
+    const options = {
+      authorization: apiKey,
+      message: `Your OTP is ${otp}. It is valid for 5 minutes.`,
+      numbers: [phoneNumber], // Pass numbers as an array
+      sender_id: "IMMPLUS", // Specify the sender ID here
+    };
+    await fast2sms
+      .sendMessage(options)
+      .then((res) => {
+        console.log(res);
+      })
+      .catch((err) => {
+        console.log(err);
       });
-
-      if (result.acknowledged) {
-        res.status(200).json({
-          status: "success",
-          message: "Delivery partner registered successfully",
-        });
-      } else {
-        res
-          .status(400)
-          .json({ status: "error", message: "Registration failed" });
-      }
-    }
+    // console.log('OTP sent successfully:', response);
   } catch (error) {
-    res.status(500).json({
-      status: "error",
-      message: "An error occurred during registration",
-      reason: error.message,
-    });
-  } finally {
-    //await client.close();
+    console.error("Error sending OTP:", error.message);
   }
 }
 
-async function loginDelivery(req, res) {
-  const { phoneNumber, password } = req.body;
+async function registerDelivery(req, res) {
+  const {
+      fullname,
+      phoneNumber,
+      address,
+      licenseNo,
+      experience,
+      city,
+      accountNumber,
+      ifscCode,
+      accountHolderName,
+      bankName,
+      otp // Added for OTP verification
+  } = req.body;
+
   let validations = [];
   let phoneNumMessage = "";
 
-  if (!password)
-    validations.push({ key: "password", message: "Password is required" });
   if (phoneNumber) {
-    if (phoneNumber.length !== 10) {
-      phoneNumMessage = "Phone Number should have 10 digits.";
-    }
+      if (phoneNumber.length !== 10) {
+          phoneNumMessage = "Phone Number should have 10 digits.";
+      }
   } else {
-    phoneNumMessage = "Phone Number is required.";
+      phoneNumMessage = "Phone Number is required.";
   }
+
+  if (phoneNumMessage) {
+      validations.push({ key: "phoneNumber", message: phoneNumMessage });
+  }
+
+  if (!address) validations.push({ key: "address", message: "Address is required" });
+  if (!fullname) validations.push({ key: "fullname", message: "Full Name is required" });
+  if (!licenseNo) validations.push({ key: "licenseNo", message: "License No is required" });
+  if (!city) validations.push({ key: "city", message: "City is required" });
+  if (!experience) validations.push({ key: "experience", message: "Experience is required" });
+  if (!accountNumber) validations.push({ key: "accountNumber", message: "Account Number is required" });
+  if (!ifscCode) validations.push({ key: "ifscCode", message: "IFSC Code is required" });
+  if (!accountHolderName) validations.push({ key: "accountHolderName", message: "Account Holder Name is required" });
+  if (!bankName) validations.push({ key: "bankName", message: "Bank Name is required" });
+  
+  if (!req.files || !req.files.licensePhoto || !req.files.licensePhoto[0].buffer) {
+      validations.push({ key: "licensePhoto", message: "License Photo is required" });
+  }
+  if (!req.files || !req.files.rcPhoto || !req.files.rcPhoto[0].buffer) {
+      validations.push({ key: "rcPhoto", message: "RC Photo is required" });
+  }
+  if (!req.files || !req.files.profilePic || !req.files.profilePic[0].buffer) {
+      validations.push({ key: "profilePic", message: "Profile Pic is required" });
+  }
+
+  if (validations.length) {
+      res.status(400).json({ status: "error", validations: validations });
+      return;
+  }
+
+  try {
+      await client.connect();
+      const db = client.db("ImmunePlus");
+      const collection = db.collection("DeliveryPartner");
+      const countersCollection = db.collection("Counters");
+
+      const existingUser = await collection.findOne({ phoneNumber });
+      if (existingUser) {
+          res.status(400).json({ status: "error", message: "Phone Number already exists" });
+          return;
+      }
+
+      if (otp) {
+          // OTP verification
+          const storedOtp = otpStorage[phoneNumber];
+          if (storedOtp && Date.now() < storedOtp.expiry) {
+              if (storedOtp.value === otp) {
+                  // OTP verified, proceed with registration
+
+                  const counter = await countersCollection.findOneAndUpdate(
+                      { _id: "deliveryPartnerId" },
+                      { $inc: { seq: 1 } },
+                      { upsert: true, returnDocument: "after" }
+                  );
+                  const newId = counter.seq;
+
+                  const licenseFilePath = path.join("uploads/delivery/license", `${newId}`);
+                  const rcFilePath = path.join("uploads/delivery/rc", `${newId}`);
+                  const profileFilePath = path.join("uploads/delivery/profilePic", `${newId}`);
+
+                  if (!fs.existsSync("uploads/delivery/license")) {
+                      fs.mkdirSync("uploads/delivery/license", { recursive: true });
+                  }
+
+                  if (!fs.existsSync("uploads/delivery/rc")) {
+                      fs.mkdirSync("uploads/delivery/rc", { recursive: true });
+                  }
+                  if (!fs.existsSync("uploads/delivery/profilePic")) {
+                      fs.mkdirSync("uploads/delivery/profilePic", { recursive: true });
+                  }
+
+                  fs.writeFileSync(licenseFilePath, req.files.licensePhoto[0].buffer);
+                  fs.writeFileSync(rcFilePath, req.files.rcPhoto[0].buffer);
+                  fs.writeFileSync(profileFilePath, req.files.profilePic[0].buffer);
+
+                  const result = await collection.insertOne({
+                      _id: newId,
+                      fullname,
+                      phoneNumber,
+                      address,
+                      licenseNo,
+                      licensePhoto: licenseFilePath,
+                      rcPhoto: rcFilePath,
+                      experience,
+                      city,
+                      profilePic: profileFilePath,
+                      accountNumber,
+                      ifscCode,
+                      accountHolderName,
+                      bankName,
+                      isApproved: 0
+                  });
+
+                  if (result.acknowledged) {
+                      res.status(200).json({
+                          status: "success",
+                          message: "Delivery partner registered successfully",
+                      });
+                  } else {
+                      res.status(400).json({ status: "error", message: "Registration failed" });
+                  }
+              } else {
+                  res.status(400).json({ status: "error", message: "Invalid OTP" });
+              }
+          } else {
+              res.status(400).json({ status: "error", message: "OTP expired or invalid" });
+          }
+      } else {
+          // Generate and send OTP
+          const otp = crypto.randomInt(100000, 999999).toString();
+          otpStorage[phoneNumber] = {
+              value: otp,
+              expiry: Date.now() + OTP_EXPIRY_TIME,
+          };
+
+          await sendOTP(phoneNumber, otp);
+          res.json({ status: "success", message: "OTP sent to your phone number" });
+      }
+  } catch (error) {
+      res.status(500).json({
+          status: "error",
+          message: "An error occurred during registration",
+          reason: error.message,
+      });
+  } finally {
+      //await client.close();
+  }
+}
+
+
+async function loginDelivery(req, res) {
+  const { phoneNumber, otp } = req.body;
+  let validations = [];
+  let phoneNumMessage = "";
+
+  // Validate phone number
+  if (!phoneNumber) {
+    phoneNumMessage = "Phone Number is required.";
+  } else if (phoneNumber.length !== 10) {
+    phoneNumMessage = "Phone Number should have 10 digits.";
+  }
+
   if (phoneNumMessage) {
     validations.push({ key: "phoneNumber", message: phoneNumMessage });
   }
@@ -223,44 +232,84 @@ async function loginDelivery(req, res) {
     await client.connect();
     const db = client.db("ImmunePlus");
     const collection = db.collection("DeliveryPartner");
-    const user = await collection.findOne({ phoneNumber });
 
-    if (user) {
-      const result = await bcrypt.compare(password, user.password);
-      if (result) {
-        if(user.isApproved == 1){
-        const userInfo = {
-          fullName: user.fullName,
-          id: user._id,
-          city: user.city,
-          licenseNo: user.licenseNo,
-          licensePhoto: user.licensePhoto,
-          address: user.address,
-          experience: user.experience,
-          phoneNumber: user.phoneNumber,
-          rcPhoto: user.rcPhoto,
-          profilePic: user.profilePic,
-        };
-        res.json({
-          status: "success",
-          message: "Login successful!",
-          user: userInfo,
-        });
-      }else if(user.isApproved == 2){
-        res.json({ status: 'decline', message: 'Your Profile is been Declined' });
-    }else {
-        res.json({ status: 'pending', message: 'Your Profile is not been approved' });
+    const user = await collection.findOne({ phoneNumber: phoneNumber });
+    if(user.isApproved != 1){
+      res.status(400).json({ status: "error", validations: "Your Account is not Approved yet." });
+      return;
     }
+    if (otp) {
+      // OTP verification
+      const storedOtp = otpStorage[phoneNumber];
+      if (storedOtp && Date.now() < storedOtp.expiry) {
+        if (storedOtp.value === otp) {
+          // Successful OTP verification
+          await client.connect();
+          const db = client.db("ImmunePlus");
+          const collection = db.collection("DeliveryPartner");
+
+          const user = await collection.findOne({ phoneNumber: phoneNumber });
+          if (user) {
+            if (user.isApproved == 1) {
+              const userInfo = {
+                fullName: user.fullName,
+                id: user._id,
+                city: user.city,
+                licenseNo: user.licenseNo,
+                licensePhoto: user.licensePhoto,
+                address: user.address,
+                experience: user.experience,
+                phoneNumber: user.phoneNumber,
+                rcPhoto: user.rcPhoto,
+                profilePic: user.profilePic,
+              };
+
+              res.json({
+                status: "success",
+                message: "Login successful!",
+                user: userInfo,
+              });
+            } else if (user.isApproved == 2) {
+              res.json({
+                status: "decline",
+                message: "Your Profile has been Declined",
+              });
+            } else {
+              res.json({
+                status: "pending",
+                message: "Your Profile is not approved",
+              });
+            }
+          } else {
+            res.status(400).json({
+              status: "error",
+              message: "Invalid Phone Number",
+            });
+          }
+
+          client.close();
+        } else {
+          res.status(400).json({ status: "error", message: "Invalid OTP" });
+        }
       } else {
         res.status(400).json({
           status: "error",
-          message: "Invalid Phone Number or password",
+          message: "OTP expired or invalid",
         });
       }
     } else {
-      res
-        .status(400)
-        .json({ status: "error", message: "Invalid Phone Number or password" });
+      // Generate and send OTP
+      const otp = crypto.randomInt(100000, 999999).toString();
+      otpStorage[phoneNumber] = {
+        value: otp,
+        expiry: Date.now() + OTP_EXPIRY_TIME,
+      };
+
+      await sendOTP(phoneNumber, otp);
+      res.json({
+        status: "success",
+        message: "OTP sent to your phone number",
+      });
     }
   } catch (error) {
     res.status(500).json({
@@ -272,6 +321,7 @@ async function loginDelivery(req, res) {
     //await client.close();
   }
 }
+
 
 async function updateDelivery(req, res) {
   const {
