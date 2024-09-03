@@ -46,7 +46,9 @@ async function create(req, res) {
                 img: img || 'default_image_path_or_value',
                 name,
                 manufacturers,
-                salt_synonmys, // Ensure this variable is properly defined in req.body
+                salt_synonmys,
+                category, 
+                sub_category,
                 introduction,
                 benefits,
                 description,

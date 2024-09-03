@@ -33,7 +33,7 @@ async function processAndUploadFile() {
             const Quantity = parseFloat(row.Quantity) || 0;
             const Product_Form = row.Product_Form || '';
             const MRP = parseFloat(row.MRP) || 0;
-            const prescription_required = row.prescription_required === 'Prescription Required';
+            const prescription_required = row.prescription_required === 'YES';
             const primary_use = row.primary_use || '';
             const description = row.description || '';
             const salt_synonmys = row.salt_synonmys || '';
