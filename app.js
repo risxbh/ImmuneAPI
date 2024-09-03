@@ -10,6 +10,7 @@ const userRoutes = require("./routes/userRoutes");
 const ageGroupRoutes = require("./routes/ageGroup");
 const typeOfTreatment = require("./routes/typeOfTreatment");
 const categoryRoutes = require("./routes/categoryRoutes");
+const subCategoryRoutes = require("./routes/subCategoryRoutes");
 const weekdayRoutes = require("./routes/weekdays");
 const docterRoutes = require("./routes/docterRoutes");
 const workingHours = require("./routes/workingHours");
@@ -55,6 +56,7 @@ app.use("/typeOfTreatment", typeOfTreatment);
 app.use(express.json());
 app.use("/uploads", express.static("uploads")); // Serve uploaded files statically
 app.use("/category", categoryRoutes);
+app.use("/subCategory", subCategoryRoutes);
 app.use("/weekday", weekdayRoutes);
 app.use("/docter", docterRoutes);
 app.use("/workingHours", workingHours);
