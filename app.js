@@ -38,7 +38,7 @@ const io = socketIo(server, {
     methods: ["GET", "POST"],
   },
 });
-const port = 5000;
+const port = 6000;
 
 // Configure CORS to allow requests from specific origins
 const corsOptions = {
@@ -49,7 +49,7 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.use(bodyParser.json());
-console.log("hit");
+
 app.use("/users", userRoutes);
 app.use("/ageGroups", ageGroupRoutes);
 app.use("/typeOfTreatment", typeOfTreatment);
