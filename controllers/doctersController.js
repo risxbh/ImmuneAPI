@@ -334,7 +334,6 @@ async function registerDoctor(req, res) {
   if (!ifscCode) validations.push({ key: "ifscCode", message: "IFSC Code is required" });
   if (!accountHolderName) validations.push({ key: "accountHolderName", message: "Account Holder Name is required" });
   if (!bankName) validations.push({ key: "bankName", message: "Bank Name is required" });
-  if (!otp) validations.push({ key: "otp", message: "OTP is required" });
 
   if (!req.file || !req.file.buffer) validations.push({ key: "img", message: "Image is required" });
 
