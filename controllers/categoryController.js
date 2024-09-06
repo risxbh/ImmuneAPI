@@ -27,7 +27,7 @@ async function create(req, res) {
         let validations = [];
        
         if (!name) validations.push({ key: 'name', message: 'Name is required' });
-        if (!req.file || !req.file.buffer) validations.push({ key: 'img', message: 'Image is required' });
+        //if (!req.file || !req.file.buffer) validations.push({ key: 'img', message: 'Image is required' });
 
         let existing = await collection.findOne({ name });
 
@@ -45,11 +45,11 @@ async function create(req, res) {
                 { upsert: true, returnDocument: 'after' }
             );
             const newId = counter.seq;
-            const filePath = path.join('uploads/category', `${newId}`);
-            if (!fs.existsSync('uploads/category')) {
-                fs.mkdirSync('uploads/category', { recursive: true });
-            }
-            fs.writeFileSync(filePath, req.file.buffer);
+            // const filePath = path.join('uploads/category', `${newId}`);
+            // if (!fs.existsSync('uploads/category')) {
+            //     fs.mkdirSync('uploads/category', { recursive: true });
+            // }
+            // fs.writeFileSync(filePath, req.file.buffer);
 
             // Get and increment the counter for TypeOfTreatment
 
@@ -57,7 +57,7 @@ async function create(req, res) {
             const result = await collection.insertOne({
                 _id: newId,
                 name,
-                img: filePath
+                img: ''
             });
 
             if (result.acknowledged === true) {

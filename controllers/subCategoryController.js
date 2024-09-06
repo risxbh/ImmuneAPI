@@ -26,9 +26,9 @@ async function create(req, res) {
 
         let validations = [];
        
-        if (!name) validations.push({ key: 'name', message: 'Name is required' });
+        //if (!name) validations.push({ key: 'name', message: 'Name is required' });
         if (!mainCategory) validations.push({ key: 'mainCategory', message: 'Main SubCategory is required' });
-        if (!req.file || !req.file.buffer) validations.push({ key: 'img', message: 'Image is required' });
+        //if (!req.file || !req.file.buffer) validations.push({ key: 'img', message: 'Image is required' });
 
         let existing = await collection.findOne({ name });
 
@@ -46,11 +46,11 @@ async function create(req, res) {
                 { upsert: true, returnDocument: 'after' }
             );
             const newId = counter.seq;
-            const filePath = path.join('uploads/subCategory', `${newId}`);
-            if (!fs.existsSync('uploads/subCategory')) {
-                fs.mkdirSync('uploads/subCategory', { recursive: true });
-            }
-            fs.writeFileSync(filePath, req.file.buffer);
+            // const filePath = path.join('uploads/subCategory', `${newId}`);
+            // if (!fs.existsSync('uploads/subCategory')) {
+            //     fs.mkdirSync('uploads/subCategory', { recursive: true });
+            // }
+            // fs.writeFileSync(filePath, req.file.buffer);
 
             // Get and increment the counter for TypeOfTreatment
 
@@ -58,7 +58,7 @@ async function create(req, res) {
             const result = await collection.insertOne({
                 _id: newId,
                 name,
-                img: filePath,
+                img: '',
                 mainCategory
             });
 
@@ -82,6 +82,25 @@ async function getAllCategories(req, res) {
         res.json(subCategories);
     } catch (error) {
         res.status(500).json({ message: 'Failed to fetch subCategories', error: error.message });
+    }
+}
+
+async function checkCategory(req, res) {
+    try {
+        await client.connect();
+        const { name } = req.body;
+        const db = client.db("ImmunePlus");
+        const collection = db.collection("SubCategory");
+
+        const existing = await collection.findOne({ name });
+
+        if (existing) {
+            res.json({ exists: true });
+        } else {
+            res.json({ exists: false });
+        }
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to check SubCategory', error: error.message });
     }
 }
 
@@ -151,5 +170,6 @@ module.exports = {
     getAllCategories,
     upload,
     update,
-    remove
+    remove,
+    checkCategory
 };
