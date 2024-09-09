@@ -289,10 +289,6 @@ async function searchProducts(req, res) {
       });
     }
 
-    // Define type mapping with partial matching
-
-    // Find if the keyword matches or is a part of any specific types
-
     // Build the search query
     const searchQuery = {
       $or: [
@@ -301,13 +297,13 @@ async function searchProducts(req, res) {
       ],
     };
 
-    // Execute the search
-    const doctors = await collection.find(searchQuery).toArray();
+    // Execute the search with a limit of 5 results
+    const products = await collection.find(searchQuery).limit(5).toArray();
 
-    if (doctors.length > 0) {
+    if (products.length > 0) {
       res.status(200).json({
         status: "success",
-        data: doctors,
+        data: products,
       });
     } else {
       res.status(404).json({
@@ -326,106 +322,58 @@ async function searchProducts(req, res) {
   }
 }
 
-// async function searchFilterDoctors(req, res) {
-//     try {
-//         await client.connect();
-//         const db = client.db("ImmunePlus");
-//         const doctorsCollection = db.collection("Products");
+async function searchFilterProducts(req, res) {
+  try {
+    await client.connect();
+    const db = client.db("ImmunePlus");
+    const productsCollection = db.collection("Products");
 
-//         // Extract filters from the request body
-//         const { keyword, treatmentType, specialist, filterDate, time } = req.body;
+    // Extract the keyword from the request body
+    const { keyword } = req.body;
 
-//         if (!keyword) {
-//           return res.status(400).json({
-//             status: "error",
-//             message: "Keyword is required for search",
-//           });
-//         }
+    if (!keyword) {
+      return res.status(400).json({
+        status: "error",
+        message: "Keyword is required for search",
+      });
+    }
 
-//         // Build the initial search query with keyword
-//         const searchQuery = {
-//           $or: [
-//             { name: { $regex: keyword, $options: "i" } },
-//             { MRP: { $regex: keyword, $options: "i" } },
-//             { use_of: { $regex: keyword, $options: "i" } },
-//           ],
-//         };
+    // Build the search query for MRP, name, and use_of fields
+    const searchQuery = {
+      $or: [
+        { name: { $regex: keyword, $options: "i" } }, // Search in the 'name' field
+        { use_of: { $regex: keyword, $options: "i" } }, // Search in the 'use_of' field
+        { MRP: { $regex: keyword, $options: "i" } }, // Search in the 'MRP' field
+      ],
+    };
 
-//         // If a type match was found, add it to the search query
+    // Execute the search with the query
+    const products = await productsCollection
+      .find(searchQuery)
+      .limit(5)
+      .toArray(); // Return only 5 results
 
-//         // Build the filter object
-//         let filters = {};
-//         if (treatmentType && treatmentType !== "0") {
-//           filters.type = parseInt(treatmentType);
-//         }
-//         if (specialist && specialist !== "0") {
-//           filters.specialist = { $regex: specialist, $options: "i" };
-//         }
-
-//         // Aggregate to join Doctors with doctoravailabilities and apply date/time filters
-//         const pipeline = [
-//           {
-//             $match: searchQuery, // Apply initial search filters
-//           },
-//           {
-//             $lookup: {
-//               from: 'doctoravailabilities', // Name of the schedule collection
-//               localField: '_id', // Doctor's _id field
-//               foreignField: 'doctorId', // doctorId in schedule
-//               as: 'schedules', // Alias for the joined data
-//             },
-//           },
-//           {
-//             $addFields: {
-//               schedules: {
-//                 $filter: {
-//                   input: '$schedules',
-//                   as: 'schedule',
-//                   cond: {
-//                     $and: [
-//                       filterDate && filterDate !== '0'
-//                         ? { $eq: [{ $toDate: '$$schedule.date' }, new Date(filterDate)] } // Match by date
-//                         : { $literal: true },
-//                       time && time !== '0'
-//                         ? { $eq: ['$$schedule.time', time] } // Match by time
-//                         : { $literal: true },
-//                     ],
-//                   },
-//                 },
-//               },
-//             },
-//           },
-//           {
-//             $match: {
-//               'schedules.0': { $exists: true }, // Ensure at least one matching schedule exists
-//             },
-//           },
-//         ];
-
-//         // Execute the aggregation pipeline
-//         const doctors = await doctorsCollection.aggregate(pipeline).toArray();
-
-//         if (doctors.length > 0) {
-//           res.status(200).json({
-//             status: 'success',
-//             data: doctors,
-//           });
-//         } else {
-//           res.status(404).json({
-//             status: 'error',
-//             message: 'No doctors found matching the criteria',
-//           });
-//         }
-//       } catch (error) {
-//         res.status(500).json({
-//           status: 'error',
-//           message: 'An error occurred during the search',
-//           reason: error.message,
-//         });
-//       } finally {
-//         // await client.close();
-//       }
-//   }
+    if (products.length > 0) {
+      res.status(200).json({
+        status: "success",
+        data: products,
+      });
+    } else {
+      res.status(404).json({
+        status: "error",
+        message: "No Products found matching the criteria",
+      });
+    }
+  } catch (error) {
+    res.status(500).json({
+      status: "error",
+      message: "An error occurred during the search",
+      reason: error.message,
+    });
+  } finally {
+    // await client.close();
+  }
+}
 
 module.exports = {
   create,
@@ -435,6 +383,7 @@ module.exports = {
   remove,
   getProductById,
   searchProducts,
+  searchFilterProducts,
 };
 
 // async function create(req, res) {
