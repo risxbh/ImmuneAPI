@@ -256,20 +256,44 @@ async function getProductById(req, res) {
       .json({ status: "error", message: "Product ID is required" });
     return;
   }
+
   try {
     await client.connect();
     const db = client.db("ImmunePlus");
-    const collection = db.collection("Products");
-    const product = await collection.find({ _id: parseInt(id) }).toArray();
-    if (product.length === 0) {
-      res.status(404).json({ status: "error", message: "Product not found" });
+
+    // Search in Products collection
+    const productsCollection = db.collection("Products");
+    const product = await productsCollection.findOne({ _id: parseInt(id) });
+
+    if (product) {
+      // If found in Products, return with type: 1
+      res.json({
+        ...product,
+        type: 1,
+      });
+      return;
+    }
+
+    // If not found in Products, search in Otc collection
+    const otcCollection = db.collection("OTC");
+    const otcProduct = await otcCollection.findOne({ _id: parseInt(id) });
+
+    if (otcProduct) {
+      // If found in Otc, return with type: 2
+      res.json({
+        ...otcProduct,
+        type: 2,
+      });
     } else {
-      res.json(product);
+      // If not found in both collections
+      res.status(404).json({ status: "error", message: "Product not found" });
     }
   } catch (error) {
     res
       .status(500)
       .json({ message: "Failed to fetch Product", error: error.message });
+  } finally {
+    await client.close();
   }
 }
 
@@ -291,10 +315,7 @@ async function searchProducts(req, res) {
 
     // Build the search query
     const searchQuery = {
-      $or: [
-        { name: { $regex: keyword, $options: "i" } },
-        { use_of: { $regex: keyword, $options: "i" } },
-      ],
+      $or: [{ name: { $regex: keyword, $options: "i" } }],
     };
 
     // Execute the search with a limit of 5 results
@@ -342,7 +363,6 @@ async function searchFilterProducts(req, res) {
     const searchQuery = {
       $or: [
         { name: { $regex: keyword, $options: "i" } }, // Search in the 'name' field
-        { use_of: { $regex: keyword, $options: "i" } }, // Search in the 'use_of' field
         { MRP: { $regex: keyword, $options: "i" } }, // Search in the 'MRP' field
       ],
     };
