@@ -276,7 +276,7 @@ async function getProductById(req, res) {
 
 async function getProductByCategory(req, res) {
   const { category, page = 1, limit = 10 } = req.query;
-
+  console.log(category);
   if (!category) {
     res.status(400).json({ status: "error", message: "Category is required" });
     return;

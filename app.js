@@ -49,6 +49,7 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.use(bodyParser.json());
+
 app.use("/users", userRoutes);
 app.use("/ageGroups", ageGroupRoutes);
 app.use("/typeOfTreatment", typeOfTreatment);
