@@ -324,7 +324,7 @@ async function searchProducts(req, res) {
     const productsCollection = db.collection("Products");
     const products = await productsCollection
       .find(searchQuery)
-      .limit(5)
+      .limit(10)
       .toArray();
 
     // Add a type field to indicate it's from Products
@@ -337,7 +337,7 @@ async function searchProducts(req, res) {
     const otcCollection = db.collection("OTC");
     const otcProducts = await otcCollection
       .find(searchQuery)
-      .limit(5)
+      .limit(10)
       .toArray();
 
     // Add a type field to indicate it's from OTC
