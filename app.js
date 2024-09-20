@@ -29,6 +29,7 @@ const pharmaNotification = require("./routes/notificationRoutes/pharmaNotificati
 const docterNotification = require("./routes/notificationRoutes/docterNotificationRoutes");
 const posterRoutes = require("./routes/posterRoutes");
 const adminRoutes = require("./routes/admin");
+const fullBodyCheckupRoutes = require('./routes/fullBodyCheckup')
 
 const app = express();
 const server = http.createServer(app);
@@ -75,6 +76,7 @@ app.use("/pharmaNotification", pharmaNotification);
 app.use("/docterNotification", docterNotification);
 app.use("/poster", posterRoutes);
 app.use("/admin", adminRoutes);
+app.use("/fullBody", fullBodyCheckupRoutes);
 
 io.on("connection", (socket) => {
   console.log("New client connected");
