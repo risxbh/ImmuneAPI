@@ -275,7 +275,6 @@ async function updateUser(req, res) {
 
   if (!id) validations.push({ key: "id", message: "User ID is required" });
 
-
   if (email && !emailRegex.test(email))
     validations.push({ key: "email", message: "Email is not valid" });
 
