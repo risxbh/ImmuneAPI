@@ -233,8 +233,7 @@ async function getBookingById(req, res) {
 }
 
 async function getBookingByDay(req, res) {
-  //http://localhost:5000/fullBody/getBookingByDay?date=2024-09-25T00:00:00.000Z
-
+  //http://localhost:6000/fullBody/getBookingByDay?date=2024-09-25
   try {
     await connectToDatabase();
     await client.connect();
@@ -247,10 +246,17 @@ async function getBookingByDay(req, res) {
       return;
     }
 
+    // Parse the date and set it to midnight UTC
+    const targetDate = new Date(date);
+    const startOfDay = new Date(targetDate.setUTCHours(0, 0, 0, 0));
+
+    // Use the exact date format stored in the database
+    const formattedStartOfDay = startOfDay.toISOString();
+
     // Find all bookings on that day
     const bookings = await appointmentsCollection
       .find({
-        dateofAppoinment: `${date}`,
+        dateofAppoinment: formattedStartOfDay,
       })
       .toArray();
 
@@ -272,7 +278,7 @@ async function getBookingByDay(req, res) {
       error: error.message,
     });
   } finally {
-    //await client.close();
+    // await client.close();
   }
 }
 
