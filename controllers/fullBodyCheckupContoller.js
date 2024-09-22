@@ -234,6 +234,7 @@ async function getBookingById(req, res) {
 
 async function getBookingByDay(req, res) {
   //http://localhost:5000/fullBody/getBookingByDay?date=2024-09-25T00:00:00.000Z
+
   try {
     await connectToDatabase();
     await client.connect();
@@ -246,15 +247,10 @@ async function getBookingByDay(req, res) {
       return;
     }
 
-    // Parse the date and set the time range for the entire day
-    const targetDate = new Date(date);
-    const startOfDay = new Date(targetDate.setHours(0, 0, 0, 0));
-    const endOfDay = new Date(targetDate.setHours(23, 59, 59, 999));
-
     // Find all bookings on that day
     const bookings = await appointmentsCollection
       .find({
-        dateofAppoinment: date,
+        dateofAppoinment: `${date}`,
       })
       .toArray();
 

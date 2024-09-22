@@ -29,7 +29,8 @@ const pharmaNotification = require("./routes/notificationRoutes/pharmaNotificati
 const docterNotification = require("./routes/notificationRoutes/docterNotificationRoutes");
 const posterRoutes = require("./routes/posterRoutes");
 const adminRoutes = require("./routes/admin");
-const fullBodyCheckupRoutes = require('./routes/fullBodyCheckup')
+const fullBodyCheckupRoutes = require("./routes/fullBodyCheckup");
+const couponsRoutes = require("./routes/couponsRoutes");
 
 const app = express();
 const server = http.createServer(app);
@@ -39,7 +40,7 @@ const io = socketIo(server, {
     methods: ["GET", "POST"],
   },
 });
-const port = 5000;
+const port = 6000;
 
 // Configure CORS to allow requests from specific origins
 const corsOptions = {
@@ -77,6 +78,7 @@ app.use("/docterNotification", docterNotification);
 app.use("/poster", posterRoutes);
 app.use("/admin", adminRoutes);
 app.use("/fullBody", fullBodyCheckupRoutes);
+app.use("/coupon", couponsRoutes);
 
 io.on("connection", (socket) => {
   console.log("New client connected");
