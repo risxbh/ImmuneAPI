@@ -55,7 +55,7 @@ async function bookAppointment(req, res) {
     await connectToDatabase();
     await client.connect();
 
-    const { name, address, age, appointmentId, userId, dateofAppointment, slotId } = req.body; // Get user data
+    const { name, address, age, PhoneNumber, appointmentId, userId, dateofAppointment, slotId } = req.body; // Get user data
     const db = client.db("ImmunePlus");
     const bookingCollection = db.collection("FullBodyBooking");
     const scheduleCollection = db.collection("FullBodySchedule");
@@ -65,6 +65,7 @@ async function bookAppointment(req, res) {
     if (!name) validations.push({ key: "name", message: "Name is required" });
     if (!userId) validations.push({ key: "userId", message: "UserId is required" });
     if (!address) validations.push({ key: "address", message: "Address is required" });
+    if (!PhoneNumber) validations.push({ key: "PhoneNumber", message: "Phone Number is required" });
     if (!age) validations.push({ key: "age", message: "Age is required" });
     if (!dateofAppointment) validations.push({ key: "dateofAppointment", message: "Date of Appointment is required" });
     if (!appointmentId) validations.push({ key: "appointmentId", message: "Appointment ID is required" });
@@ -108,6 +109,7 @@ async function bookAppointment(req, res) {
         name,
         address,
         age,
+        PhoneNumber,
         appointmentId: parseInt(appointmentId),
         slotId: slotId,
         bookingDate: new Date(),
@@ -123,6 +125,7 @@ async function bookAppointment(req, res) {
             name,
             address,
             age,
+            PhoneNumber,
             appointmentId,
             slotId
           }
