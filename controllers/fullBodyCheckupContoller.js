@@ -70,11 +70,11 @@ async function bookAppointment(req, res) {
       name,
       address,
       age,
+      phoneNumber,
       appointmentId,
       time,
       userId,
       dateofAppoinment,
-      location,
     } = req.body; // Get user data
 
     const db = client.db("ImmunePlus");
@@ -89,6 +89,7 @@ async function bookAppointment(req, res) {
     if (!address)
       validations.push({ key: "address", message: "Address is required" });
     if (!age) validations.push({ key: "age", message: "Age is required" });
+    if (!phoneNumber) validations.push({ key: "phoneNumber", message: "phone Number is required" });
     if (!dateofAppoinment)
       validations.push({
         key: "dateofAppoinment",
@@ -101,8 +102,6 @@ async function bookAppointment(req, res) {
       });
     if (!time)
       validations.push({ key: "time", message: "Time slot is required" });
-    if (!location)
-      validations.push({ key: "location", message: "Location is required" });
 
     if (validations.length) {
       res.status(400).json({ status: "error", validations: validations });
@@ -154,12 +153,12 @@ async function bookAppointment(req, res) {
         name,
         address,
         age,
+        phoneNumber,
         appointmentId: parseInt(appointmentId),
         bookingDate: new Date(),
         userId,
         dateofAppoinment,
         time,
-        location,
       });
 
       if (bookingResult.acknowledged) {
@@ -170,9 +169,9 @@ async function bookAppointment(req, res) {
             name,
             address,
             age,
+            phoneNumber,
             appointmentId,
             time,
-            location,
           },
         });
       } else {
