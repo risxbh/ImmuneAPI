@@ -166,6 +166,7 @@ async function bookAppointment(req, res) {
           status: "success",
           message: "Appointment booked successfully",
           appointmentDetails: {
+            bookingId: bookingResult.insertedId,
             name,
             address,
             age,
