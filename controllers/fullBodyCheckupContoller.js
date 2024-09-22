@@ -51,11 +51,32 @@ const upload = multer({ storage });
 const mongoose = require("mongoose");
 
 async function bookAppointment(req, res) {
+  // {
+  //   "name": "John Doe",
+  //   "address": "123 Main St, Cityville",
+  //   "age": 32,
+  //   "appointmentId": 9,
+  //   "time": "04:00 PM",
+  //   "userId":  4118,
+  //   "dateofAppoinment": "2024-09-25T00:00:00.000+00:00",
+  //   "location": "Health Clinic, Cityville"
+  // }
+
   try {
     await connectToDatabase();
     await client.connect();
 
-    const { name, address, age, PhoneNumber, appointmentId, userId, dateofAppointment, slotId } = req.body; // Get user data
+    const {
+      name,
+      address,
+      age,
+      appointmentId,
+      time,
+      userId,
+      dateofAppoinment,
+      location,
+    } = req.body; // Get user data
+
     const db = client.db("ImmunePlus");
     const bookingCollection = db.collection("FullBodyBooking");
     const scheduleCollection = db.collection("FullBodySchedule");
@@ -63,44 +84,68 @@ async function bookAppointment(req, res) {
     // Validate input fields
     let validations = [];
     if (!name) validations.push({ key: "name", message: "Name is required" });
-    if (!userId) validations.push({ key: "userId", message: "UserId is required" });
-    if (!address) validations.push({ key: "address", message: "Address is required" });
-    if (!PhoneNumber) validations.push({ key: "PhoneNumber", message: "Phone Number is required" });
+    if (!userId)
+      validations.push({ key: "userId", message: "UserId is required" });
+    if (!address)
+      validations.push({ key: "address", message: "Address is required" });
     if (!age) validations.push({ key: "age", message: "Age is required" });
-    if (!dateofAppointment) validations.push({ key: "dateofAppointment", message: "Date of Appointment is required" });
-    if (!appointmentId) validations.push({ key: "appointmentId", message: "Appointment ID is required" });
-    if (!slotId) validations.push({ key: "slotId", message: "Slot ID is required" });
+    if (!dateofAppoinment)
+      validations.push({
+        key: "dateofAppoinment",
+        message: "Date of Appointment is required",
+      });
+    if (!appointmentId)
+      validations.push({
+        key: "appointmentId",
+        message: "Appointment ID is required",
+      });
+    if (!time)
+      validations.push({ key: "time", message: "Time slot is required" });
+    if (!location)
+      validations.push({ key: "location", message: "Location is required" });
 
     if (validations.length) {
       res.status(400).json({ status: "error", validations: validations });
       return;
     }
 
-    // Check if the appointment date exists
-    const appointment = await scheduleCollection.findOne({ _id: parseInt(appointmentId) });
+    // Check if the appointment is available for the given time and date
+    const appointment = await scheduleCollection.findOne({
+      _id: parseInt(appointmentId),
+      date: new Date(dateofAppoinment),
+    });
 
     if (!appointment) {
-      res.status(404).json({ status: "error", message: "Appointment not found" });
+      res
+        .status(404)
+        .json({ status: "error", message: "Appointment not found" });
       return;
     }
 
-    // Find the specific time slot
-    const slot = appointment.timeSlots.find((slot) => slot.id === slotId);
-
-    if (!slot) {
-      res.status(404).json({ status: "error", message: "Slot not found" });
+    // Find the time slot in the appointment's schedule
+    const timeIndex = appointment.time.indexOf(time);
+    if (timeIndex === -1) {
+      res
+        .status(400)
+        .json({ status: "error", message: "Time slot not available" });
       return;
     }
 
-    if (slot.availableSlots <= 0) {
-      res.status(400).json({ status: "error", message: "No available slots for this time slot" });
+    if (appointment.availableSlots[timeIndex] <= 0) {
+      res.status(400).json({
+        status: "error",
+        message: "No available slots for this time",
+      });
       return;
     }
 
-    // Deduct one slot from the available slots of the specific time slot
+    // Deduct one slot from the available slots for the selected time
+    const updateSlots = [...appointment.availableSlots];
+    updateSlots[timeIndex] -= 1;
+
     const updateResult = await scheduleCollection.updateOne(
-      { _id: parseInt(appointmentId), "timeSlots.id": slotId },
-      { $inc: { "timeSlots.$.availableSlots": -1 } }
+      { _id: parseInt(appointmentId), date: new Date(dateofAppoinment) },
+      { $set: { availableSlots: updateSlots } }
     );
 
     if (updateResult.modifiedCount > 0) {
@@ -109,12 +154,12 @@ async function bookAppointment(req, res) {
         name,
         address,
         age,
-        PhoneNumber,
         appointmentId: parseInt(appointmentId),
-        slotId: slotId,
         bookingDate: new Date(),
         userId,
-        dateofAppointment
+        dateofAppoinment,
+        time,
+        location,
       });
 
       if (bookingResult.acknowledged) {
@@ -125,26 +170,27 @@ async function bookAppointment(req, res) {
             name,
             address,
             age,
-            PhoneNumber,
             appointmentId,
-            slotId
-          }
+            time,
+            location,
+          },
         });
       } else {
-        // If booking insertion fails, revert the slot update
-        await scheduleCollection.updateOne(
-          { _id: parseInt(appointmentId), "timeSlots.id": slotId },
-          { $inc: { "timeSlots.$.availableSlots": 1 } }
-        );
-        res.status(400).json({ status: "error", message: "Booking insertion failed" });
+        res
+          .status(400)
+          .json({ status: "error", message: "Booking insertion failed" });
       }
     } else {
-      res.status(400).json({ status: "error", message: "Failed to update available slots" });
+      res
+        .status(400)
+        .json({ status: "error", message: "Failed to update available slots" });
     }
   } catch (error) {
-    res.status(500).json({ message: "Failed to book appointment", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Failed to book appointment", error: error.message });
   } finally {
-    //await client.close();
+    // await client.close();
   }
 }
 
@@ -152,19 +198,19 @@ async function getBookingById(req, res) {
   try {
     await connectToDatabase();
     await client.connect();
-    const { id } = req.query; // Get booking ID from query
-
-    if (!id) {
-      res.status(400).json({ status: "error", message: "Booking ID is required" });
-      return;
-    }
-
+    const { id } = req.query;
     const db = client.db("ImmunePlus");
     const appointmentsCollection = db.collection("FullBodyBooking");
 
-    // Find the booking by ID, converting the id string to an ObjectId
+    if (!id) {
+      res
+        .status(400)
+        .json({ status: "error", message: "Booking ID is required" });
+      return;
+    }
+
     const appointment = await appointmentsCollection.findOne({
-      _id: new ObjectId(id) // Convert id to ObjectId for MongoDB query
+      _id: new ObjectId(id), // Use 'new' keyword with ObjectId
     });
 
     if (!appointment) {
@@ -182,120 +228,106 @@ async function getBookingById(req, res) {
       error: error.message,
     });
   } finally {
-    // await client.close(); // Commented out for now
+    // await client.close();
   }
 }
 
 async function getBookingByDay(req, res) {
+  //http://localhost:5000/fullBody/getBookingByDay?date=2024-09-25T00:00:00.000Z
   try {
     await connectToDatabase();
     await client.connect();
-    const { date } = req.query; // Get the date from query parameters
+    const { date } = req.query; // Get the date from the query params
+    const db = client.db("ImmunePlus");
+    const appointmentsCollection = db.collection("FullBodyBooking");
 
     if (!date) {
       res.status(400).json({ status: "error", message: "Date is required" });
       return;
     }
 
-    const db = client.db("ImmunePlus");
-    const appointmentsCollection = db.collection("FullBodyBooking");
-
-    // Parse the date and set time range for the entire day
+    // Parse the date and set the time range for the entire day
     const targetDate = new Date(date);
     const startOfDay = new Date(targetDate.setHours(0, 0, 0, 0));
     const endOfDay = new Date(targetDate.setHours(23, 59, 59, 999));
 
-    // Find all bookings on the given day
-    const bookings = await appointmentsCollection.find({
-      dateofAppointment: {
-        $gte: startOfDay,
-        $lte: endOfDay
-      }
-    }).toArray();
+    // Find all bookings on that day
+    const bookings = await appointmentsCollection
+      .find({
+        dateofAppoinment: date,
+      })
+      .toArray();
 
     if (bookings.length === 0) {
       res.status(404).json({
         status: "error",
-        message: "No bookings found for the given day"
+        message: "No bookings found for the given day",
       });
       return;
     }
 
     res.status(200).json({
       status: "success",
-      bookings
+      bookings,
     });
   } catch (error) {
     res.status(500).json({
       message: "Failed to retrieve bookings for the day",
-      error: error.message
+      error: error.message,
     });
   } finally {
-    // await client.close(); // Commented out for now
+    //await client.close();
   }
 }
 
 async function createSchedule(req, res) {
+  // {
+  //   "date": "2024-09-25",
+  //   "availableSlots": "5,3,4,2",
+  //   "time": "09:00 AM, 11:00 AM, 02:00 PM, 04:00 PM"
+  // }
+
   try {
     await connectToDatabase();
     await client.connect();
-    const { date, timeSlots } = req.body; // date and timeSlots array from the request
+    const { date, availableSlots, time } = req.body;
+
     const db = client.db("ImmunePlus");
     const collection = db.collection("FullBodySchedule");
     const countersCollection = db.collection("Counters");
 
-    // Validate date and timeSlots
+    // Validate date, availableSlots, and time
     let validations = [];
     if (!date) validations.push({ key: "date", message: "Date is required" });
-    if (!Array.isArray(timeSlots) || !timeSlots.length)
-      validations.push({ key: "timeSlots", message: "Time slots are required and should be an array" });
-    else {
-      // Check each time slot object
-      timeSlots.forEach((slot, index) => {
-        if (!slot.time) validations.push({ key: `timeSlots[${index}].time`, message: "Time is required for each slot" });
-        if (slot.totalSlots === undefined) validations.push({ key: `timeSlots[${index}].totalSlots`, message: "Total slots are required for each slot" });
-
-        slot.availableSlots = slot.totalSlots;
-
-        // Assign a unique ID to each time slot if it doesn't have one
-        if (!slot.id) {
-          slot.id = new ObjectId().toString(); // Use MongoDB ObjectId as a unique identifier
-        }
+    if (!availableSlots)
+      validations.push({
+        key: "availableSlots",
+        message: "Available slots are required",
       });
-    }
+    if (!time)
+      validations.push({ key: "time", message: "Time slots are required" });
 
     if (validations.length) {
       res.status(400).json({ status: "error", validations: validations });
       return;
     }
 
+    // Parse availableSlots and time into arrays
+    const availableSlotsArray = availableSlots.split(",").map(Number); // Ensure they're numbers
+    const timeArray = time.split(",").map((t) => t.trim()); // Trim whitespace around time values
+
     // Check if a schedule for the given date exists
-    const existingSchedule = await collection.findOne({
-      date: new Date(date),
-    });
+    const existingSchedule = await collection.findOne({ date: new Date(date) });
 
     if (existingSchedule) {
-      // Combine existing time slots with the new ones, maintaining unique IDs
-      const updatedTimeSlots = existingSchedule.timeSlots || [];
-
-      timeSlots.forEach(newSlot => {
-        const index = updatedTimeSlots.findIndex(slot => slot.id === newSlot.id);
-        if (index > -1) {
-          // Update existing slot
-          updatedTimeSlots[index] = { ...updatedTimeSlots[index], ...newSlot };
-        } else {
-          // Add new slot
-          updatedTimeSlots.push(newSlot);
-        }
-      });
-
-      // Update the existing schedule with new or updated time slots
+      // Update the existing schedule if the date exists
       const updateResult = await collection.updateOne(
         { _id: existingSchedule._id },
         {
           $set: {
-            timeSlots: updatedTimeSlots,
-          }
+            availableSlots: availableSlotsArray,
+            time: timeArray, // Update the time array
+          },
         }
       );
 
@@ -314,13 +346,15 @@ async function createSchedule(req, res) {
         { $inc: { seq: 1 } },
         { upsert: true, returnDocument: "after" }
       );
-      const newId = counter ? counter.seq : 1;
+      const newId = counter.seq;
 
       // Create new schedule record
       const newSchedule = {
         _id: newId,
         date: new Date(date),
-        timeSlots,
+        totalslots: availableSlotsArray,
+        availableSlots: availableSlotsArray,
+        time: timeArray,
       };
 
       // Insert the new schedule
@@ -336,78 +370,77 @@ async function createSchedule(req, res) {
       }
     }
   } catch (error) {
-    res
-      .status(500)
-      .json({ message: "Failed to create or update schedule", error: error.message });
+    res.status(500).json({
+      message: "Failed to create or update schedule",
+      error: error.message,
+    });
   } finally {
-    //await client.close(); // Commented out for debugging purposes
+    // await client.close();
   }
 }
 
 async function deleteSchedule(req, res) {
   try {
-    await connectToDatabase();
-
     const { id } = req.body;
-
-    if (!id) {
-      return res.status(400).json({ status: "error", message: "Schedule ID is required" });
-    }
-
+    await client.connect();
     const db = client.db("ImmunePlus");
     const collection = db.collection("FullBodySchedule");
 
-    // Convert id string to ObjectId
     const result = await collection.deleteOne({ _id: parseInt(id) });
 
     if (result.deletedCount > 0) {
-      return res.status(200).json({ status: "success", message: "Schedule Deleted" });
+      res.status(200).json({ status: "success", message: "Schedule Deleted" });
     } else {
-      return res.status(404).json({ status: "error", message: "Schedule not found" });
+      res.status(400).json({ status: "error", message: "Delete failed" });
     }
   } catch (error) {
-    return res.status(500).json({ message: "Failed to delete Schedule", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Failed to delete Schedule", error: error });
   }
 }
 
 async function getAvailableSchedule(req, res) {
   try {
-    await connectToDatabase();
+    await connectToDatabase(); // Ensure the database is connected
+    await client.connect();
+
     const db = client.db("ImmunePlus");
     const scheduleCollection = db.collection("FullBodySchedule");
 
-    // Set today's date at midnight (00:00:00)
+    // Get today's date and set time to 00:00:00 for comparison
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // Fetch all schedules from today onwards
-    const schedules = await scheduleCollection.find({
-      date: { $gte: today }
-    }).toArray();
-
-    // Filter schedules with available time slots
-    const availableSchedules = schedules
-      .map(schedule => {
-        if (Array.isArray(schedule.timeSlots)) {
-          // Check if there are any time slots available
-          const availableTimeSlots = schedule.timeSlots.filter(slot => slot.availableSlots > 0);
-          // Return the schedule with available time slots or null if none are available
-          return availableTimeSlots.length ? { ...schedule, timeSlots: availableTimeSlots } : null;
-        }
-        return null;
+    // Fetch all schedules that have a date today or later
+    const availableSchedules = await scheduleCollection
+      .find({
+        date: { $gte: today }, // Greater than or equal to today's date
       })
-      .filter(schedule => schedule !== null);
+      .toArray();
 
-    // Check if no available schedules were found
+    // Check if there are any schedules available
     if (availableSchedules.length === 0) {
-      return res.status(404).json({ status: "error", message: "No available schedules with free slots found" });
+      return res.status(404).json({
+        status: "error",
+        message: "No available schedules found",
+      });
     }
 
     // Return the available schedules
-    return res.status(200).json({ status: "success", availableSchedules });
+    return res.status(200).json({
+      status: "success",
+      availableSchedules,
+    });
   } catch (error) {
-    // Handle errors and return a 500 response
-    return res.status(500).json({ status: "error", message: "Failed to retrieve available schedules", error: error.message });
+    // Handle any errors
+    return res.status(500).json({
+      message: "Failed to retrieve available schedules",
+      error: error.message,
+    });
+  } finally {
+    // Close the database connection if necessary
+    // await client.close();
   }
 }
 
@@ -417,6 +450,5 @@ module.exports = {
   createSchedule,
   deleteSchedule,
   getAvailableSchedule, // Exporting correctly
-  getBookingByDay
+  getBookingByDay,
 };
-
