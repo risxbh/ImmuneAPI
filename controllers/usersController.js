@@ -306,7 +306,7 @@ async function addEditAddressById(req, res) {
       return;
     }
 
-    let updatedAddresses = [...user.addresses]; // Copy existing addresses
+    let updatedAddresses = [...user.address]; // Copy existing addresses
 
     // If an index is provided, update that specific address
     if (index !== undefined && index >= 0 && index < updatedAddresses.length) {

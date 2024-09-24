@@ -21,6 +21,6 @@ router.get("/records", getAll);
 router.get("/getById", getUserbyId);
 router.get("/appointment", getUserAppointment);
 router.post("/dummylogin", dummyLoginUser);
-router.post("/addressById", addEditAddressById);
+router.post("/addressById/:userId", addEditAddressById);
 
 module.exports = router;
