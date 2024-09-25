@@ -256,15 +256,15 @@ async function calculatePrice(req, res) {
 
     // Final price calculation
     const discountedPrice = totalProductPrice - discount;
-    let handlingPrice = 0; // Use 'let' to allow reassignment
+    let handlingPrice = 0;
 
     if (discountedPrice < 250) {
-      handlingPrice = 25; // Assign handling fee if discounted price is below 250
+      handlingPrice = 25;
     } else {
-      handlingPrice = 0; // No handling fee otherwise
+      handlingPrice = 0;
     }
 
-    const finalPrice = discountedPrice + deliveryFee + handlingPrice; // Include handlingPrice in final calculation
+    const finalPrice = discountedPrice + deliveryFee + handlingPrice;
     res.status(200).json({
       status: "success",
       totalProductPrice,
