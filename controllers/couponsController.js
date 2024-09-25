@@ -256,14 +256,20 @@ async function calculatePrice(req, res) {
 
     // Final price calculation
     const discountedPrice = totalProductPrice - discount;
-    const gst = discountedPrice * 0.18; // 18% GST
-    const finalPrice = discountedPrice + gst + deliveryFee;
+    const handlingPrice = 0;
+    if(discountedPrice > 250){
+      handlingPrice = 25
+    }
+    else {
+      handlingPrice = 0
+    }
+    const finalPrice = discountedPrice + deliveryFee ;
     res.status(200).json({
       status: "success",
       totalProductPrice,
       discount,
+      handlingPrice,
       deliveryFee,
-      gst,
       finalPrice,
     });
   } catch (error) {
