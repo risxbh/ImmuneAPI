@@ -569,6 +569,7 @@ async function dummyLoginUser(req, res) {
         pincode: user.pincode,
         phoneNumber: user.phoneNumber,
         previousHistory: user.previousHistory,
+        addresses: user.addresses
       };
 
       res.json({
