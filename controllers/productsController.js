@@ -293,7 +293,7 @@ async function getProductById(req, res) {
       .status(500)
       .json({ message: "Failed to fetch Product", error: error.message });
   } finally {
-    await client.close();
+    //await client.close();
   }
 }
 
