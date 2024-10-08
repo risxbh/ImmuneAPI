@@ -226,7 +226,7 @@ async function registerUser(req, res) {
             { $inc: { seq: 1 } },
             { upsert: true, returnDocument: "after" }
           );
-          const newId = counter.value.seq;
+          const newId = counter.seq;
 
           const result = await collection.insertOne({
             addresses, // Storing multiple addresses

@@ -10,7 +10,6 @@ const {
 } = require("../controllers/otcProductController");
 
 const router = express.Router();
-console.log("hit");
 router.post("/create", create);
 router.get("/records", getAllProducts);
 router.post("/update", upload.single("img"), update);
